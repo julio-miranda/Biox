@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <title>BiOX - Iniciar sesión</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <script defer src="js/controllers/login.client.controller.js"></script>
+</head>
+
+<body>
+    <div class="section">
+        <h2>Iniciar sesión</h2>
+
+        <form id="login-form">
+            <input
+                type="email"
+                id="login-email"
+                placeholder="Correo electrónico"
+                autocomplete="username"
+                required
+            >
+
+            <input
+                type="password"
+                id="login-password"
+                placeholder="Contraseña"
+                autocomplete="current-password"
+                required
+            >
+
+            <button type="submit">Ingresar</button>
+
+            <button
+                type="button"
+                id="btn-forgot-password"
+            >
+                ¿Olvidaste tu contraseña?
+            </button>
+
+            <p
+                id="login-message"
+                role="status"
+                aria-live="polite"
+            ></p>
+        </form>
+    </div>
+</body>
+</html>
