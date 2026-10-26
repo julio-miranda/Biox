@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Inventario | BIOX</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body data-page="inventario">
+
+    <header id="appNavbar"></header>
+
+    <main class="page">
+
+        <!-- Encabezado -->
+        <section class="page-header">
+            <div>
+                <h1>Gestión de inventario</h1>
+                <p>Administra productos, existencias y recetas.</p>
+            </div>
+        </section>
+
+        <!-- Mensajes -->
+        <div
+            id="mensaje"
+            class="message"
+            role="status"
+            aria-live="polite">
+        </div>
+
+        <!-- Acciones principales -->
+        <div class="inventory-actions">
+            <button
+                id="btnRecargar"
+                class="btn btn-secondary"
+                type="button">
+                <i class="fa-solid fa-rotate"></i>
+                Recargar
+            </button>
+
+            <button
+                id="btnAdd"
+                class="btn btn-primary"
+                type="button">
+                <i class="fa-solid fa-plus"></i>
+                Añadir producto
+            </button>
+
+            <button
+                id="btnRecetas"
+                class="btn btn-secondary"
+                type="button">
+                <i class="fa-solid fa-list"></i>
+                Gestionar recetas
+            </button>
+        </div>
+
+        <!-- Estadísticas -->
+        <section class="stats-container" data-inventory-summary>
+
+            <article class="stat-card">
+                <h3>Total de productos</h3>
+                <p id="totalProductsCard">0</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Valor del inventario</h3>
+                <p id="totalValueCard">$0.00</p>
+            </article>
+
+            <article class="stat-card">
+                <h3>Productos con stock bajo</h3>
+                <p id="lowStockCard">0</p>
+            </article>
+
+        </section>
+
+        <!-- Tabla de productos -->
+        <section class="card">
+
+            <div class="card-header">
+                <h2>Productos</h2>
+
+                <div class="form-group search-container">
+                    <label for="salesSearch">Buscar producto</label>
+                    <input
+                        id="salesSearch"
+                        class="search-input"
+                        type="search"
+                        placeholder="Buscar por nombre, categoría o tipo..."
+                        autocomplete="off">
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table id="inventoryTable">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Tipo</th>
+                            <th>Stock actual</th>
+                            <th>Unidad</th>
+                            <th>Stock mínimo</th>
+                            <th>Estado del stock</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody data-inventory-products>
+                        <tr>
+                            <td colspan="8" class="empty-state">
+                                Cargando productos...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <!-- Gestión de recetas -->
+        <section id="recetasPanel" class="card" hidden>
+
+            <div class="inventory-actions">
+                <h2 class="inventory-actions__heading">
+                    Gestión de recetas
+                </h2>
+
+                <button
+                    id="btnAddReceta"
+                    class="btn btn-primary"
+                    type="button">
+                    <i class="fa-solid fa-plus"></i>
+                    Agregar receta
+                </button>
+
+                <button
+                    id="btnCerrarRecetas"
+                    class="btn btn-secondary"
+                    type="button">
+                    Cerrar
+                </button>
+            </div>
+
+            <p class="section-note">
+                Administra los productos preparados y los ingredientes
+                que utiliza cada receta.
+            </p>
+
+            <div class="table-responsive">
+                <table id="recetasTable">
+                    <thead>
+                        <tr>
+                            <th>Producto preparado</th>
+                            <th>Descripción</th>
+                            <th>Ingredientes</th>
+                            <th>Consumo por unidad vendida</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+
+                    <tbody data-inventory-recipes>
+                        <tr>
+                            <td colspan="6" class="empty-state">
+                                Cargando recetas...
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </section>
+
+        <!-- Productos con stock bajo -->
+        <section id="lowStockPanel" class="card" hidden>
+            <h2>Productos con stock bajo</h2>
+            <div id="lowStockContent"></div>
+        </section>
+
+    </main>
+
+    <!-- Modal de productos -->
+    <dialog
+        id="productoModal"
+        class="modal-form"
+        data-inventory-modal>
+
+        <form
+            id="productoForm"
+            data-inventory-form="producto">
+
+            <h2 id="productoModalTitle">Agregar producto</h2>
+
+            <input type="hidden" name="productos_id">
+
+            <div class="form-grid">
+                <div
+                    class="form-group full-width"
+                    data-product-mode-control>
+                    <label for="modoProducto">Producto</label>
+                    <select id="modoProducto" name="modo_producto">
+                        <option value="nuevo">Crear un producto nuevo</option>
+                        <option value="existente">
+                            Agregar compra a un producto existente
+                        </option>
+                    </select>
+                </div>
+
+                <div
+                    class="form-group full-width"
+                    data-product-existing-field
+                    hidden>
+                    <label for="productoExistente">
+                        Selecciona el producto existente
+                    </label>
+                    <select
+                        id="productoExistente"
+                        name="producto_existente_id"
+                        data-inventory-select="producto-existente"
+                        disabled>
+                        <option value="">
+                            Selecciona un producto inventariable
+                        </option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoNombre">Nombre</label>
+                    <input
+                        id="productoNombre"
+                        name="nombre"
+                        type="text"
+                        maxlength="150"
+                        required>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoCategoria">Categoría</label>
+                    <select
+                        id="productoCategoria"
+                        name="categoria_id"
+                        data-inventory-select="categoria"
+                        required>
+                        <option value="">Selecciona una categoría</option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoTipo">Tipo</label>
+                    <select id="productoTipo" name="tipo" required>
+                        <option value="insumo">Insumo</option>
+                        <option value="botella">Botella</option>
+                        <option value="trago_preparado" disabled>
+                            Trago preparado
+                        </option>
+                        <option value="servicio">Servicio</option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoUnidad">Unidad de medida</label>
+                    <select
+                        id="productoUnidad"
+                        name="unidad_medida"
+                        required>
+                        <option value="unidad">Unidad</option>
+                        <option value="ml">Mililitros (ml)</option>
+                        <option value="litro">Litros</option>
+                        <option value="gramo">Gramos</option>
+                        <option value="kilogramo">Kilogramos</option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoPrecio">Precio de venta ($)</label>
+                    <input
+                        id="productoPrecio"
+                        name="precio"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        required>
+                </div>
+
+                <div class="form-group" data-product-edit-field hidden>
+                    <label for="productoCosto">Costo promedio ($)</label>
+                    <input
+                        id="productoCosto"
+                        name="costo_promedio"
+                        type="number"
+                        min="0"
+                        step="0.000001"
+                        value="0"
+                        disabled>
+                </div>
+
+                <div class="form-group" data-product-new-field>
+                    <label for="productoStockMinimo">
+                        Stock mínimo (<span data-stock-minimum-unit>unidad</span>)
+                    </label>
+                    <input
+                        id="productoStockMinimo"
+                        name="stock_minimo"
+                        type="number"
+                        min="0"
+                        step="any"
+                        value="0"
+                        required>
+                </div>
+
+                <div
+                    class="form-group form-check"
+                    data-product-edit-field
+                    hidden>
+                    <input
+                        id="productoActivo"
+                        name="activo"
+                        type="checkbox"
+                        checked>
+                    <label for="productoActivo">Producto activo</label>
+                </div>
+            </div>
+
+            <section
+                id="productoCompraFields"
+                class="product-purchase-fields"
+                data-product-entry>
+                <h3>Datos de la compra</h3>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="productoProveedor">
+                            Proveedor de esta compra
+                        </label>
+                        <select
+                            id="productoProveedor"
+                            name="proveedor_id"
+                            data-inventory-select="proveedor-compra"
+                            required>
+                            <option value="">Selecciona un proveedor</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoCajas">Cantidad de cajas</label>
+                        <input
+                            id="productoCajas"
+                            name="cajas"
+                            type="number"
+                            min="1"
+                            step="1"
+                            required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoUnidadesCaja">
+                            Unidades por caja
+                        </label>
+                        <input
+                            id="productoUnidadesCaja"
+                            name="unidades_por_caja"
+                            type="number"
+                            min="1"
+                            step="1"
+                            required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoTotalUnidades">
+                            Total de unidades que se agregarán
+                        </label>
+                        <input
+                            id="productoTotalUnidades"
+                            type="text"
+                            value="0 unidades"
+                            readonly
+                            aria-live="polite">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoCostoCaja">
+                            Costo por caja ($)
+                        </label>
+                        <input
+                            id="productoCostoCaja"
+                            name="costo_por_caja"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            required>
+                    </div>
+
+                    <div
+                        id="productoContenidoFields"
+                        class="form-group full-width"
+                        hidden>
+                        <label for="productoContenido">
+                            Contenido inicial de cada botella (ml)
+                        </label>
+                        <input
+                            id="productoContenido"
+                            name="contenido_inicial_ml"
+                            type="number"
+                            min="0.001"
+                            step="any"
+                            disabled>
+                        <small>
+                            Cada botella se registrará como un envase y el
+                            inventario aumentará por su contenido total.
+                        </small>
+                    </div>
+
+                    <div class="form-group full-width">
+                        <label for="productoNota">Observación de la compra</label>
+                        <textarea
+                            id="productoNota"
+                            name="observacion"
+                            rows="2"
+                            maxlength="1000"
+                            placeholder="Dato adicional (opcional)"></textarea>
+                    </div>
+                </div>
+
+                <p
+                    id="productoCompraResumen"
+                    class="section-note"
+                    aria-live="polite">
+                    Indica las cajas y unidades por caja para calcular el total.
+                </p>
+            </section>
+
+            <div class="modal-actions">
+                <button
+                    class="btn btn-secondary"
+                    type="button"
+                    data-inventory-cancel>
+                    Cancelar
+                </button>
+
+                <button class="btn btn-primary" type="submit">
+                    Guardar producto
+                </button>
+            </div>
+
+        </form>
+    </dialog>
+
+    <!-- Modal de recetas -->
+    <dialog
+        id="recetaModal"
+        class="modal-form"
+        data-inventory-modal>
+
+        <form
+            id="recetaForm"
+            data-inventory-form="receta">
+
+            <h2 id="recetaModalTitle">Agregar receta</h2>
+
+            <input type="hidden" name="recetas_id">
+
+            <div class="form-grid">
+
+                <div class="form-group full-width" id="grupoModoProductoReceta">
+                    <label for="recetaModoProducto">Producto preparado</label>
+                    <select id="recetaModoProducto" name="modo_producto">
+                        <option value="nuevo">Crear un trago preparado y su receta</option>
+                        <option value="existente">Agregar receta a un producto preparado existente</option>
+                    </select>
+                </div>
+
+                <div class="form-group full-width" id="grupoProductoPreparadoExistente">
+                    <label for="recetaProducto">Producto preparado existente</label>
+
+                    <select
+                        id="recetaProducto"
+                        name="producto_id"
+                        data-receta-producto-existente
+                        data-inventory-select="producto-preparado"
+                        required>
+                        <option value="">
+                            Selecciona el producto preparado
+                        </option>
+                    </select>
+                </div>
+
+                <div class="form-group full-width" data-receta-producto-nuevo hidden>
+                    <label for="recetaNombreProducto">Nombre del trago preparado *</label>
+                    <input
+                        id="recetaNombreProducto"
+                        name="producto_nuevo_nombre"
+                        type="text"
+                        maxlength="150"
+                        required
+                        disabled>
+                </div>
+
+                <div class="form-group" data-receta-producto-nuevo hidden>
+                    <label for="recetaCategoriaProducto">Categoría *</label>
+                    <select
+                        id="recetaCategoriaProducto"
+                        name="producto_nuevo_categoria_id"
+                        data-inventory-select="categoria-receta"
+                        required
+                        disabled>
+                        <option value="">Selecciona una categoría</option>
+                    </select>
+                </div>
+
+                <div class="form-group" data-receta-producto-nuevo hidden>
+                    <label for="recetaPrecioProducto">Precio de venta *</label>
+                    <input
+                        id="recetaPrecioProducto"
+                        name="producto_nuevo_precio"
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value="0"
+                        required
+                        disabled>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="recetaDescripcion">Descripción</label>
+                    <textarea
+                        id="recetaDescripcion"
+                        name="descripcion"
+                        rows="2"
+                        maxlength="1000"
+                        placeholder="Descripción de la preparación"></textarea>
+                </div>
+
+                <div class="form-group form-check">
+                    <input
+                        id="recetaActiva"
+                        name="activa"
+                        type="checkbox"
+                        checked>
+                    <label for="recetaActiva">Receta activa</label>
+                </div>
+
+            </div>
+
+            <hr>
+
+            <!-- Ingredientes de la receta -->
+            <div class="inventory-actions">
+                <h3 class="inventory-actions__heading">
+                    Ingredientes
+                </h3>
+
+                <button
+                    id="btnAgregarIngrediente"
+                    class="btn btn-primary"
+                    type="button">
+                    <i class="fa-solid fa-plus"></i>
+                    Añadir ingrediente
+                </button>
+            </div>
+
+            <p class="section-note">
+                Indica la cantidad exacta de cada ingrediente que consume
+                una unidad vendida del trago.
+            </p>
+
+            <div
+                id="recetaIngredientes"
+                class="recipe-ingredients"
+                data-inventory-ingredients>
+                <!-- Los ingredientes se agregan dinámicamente -->
+            </div>
+
+            <p
+                class="recipe-consumption-preview"
+                data-recipe-consumption-preview
+                role="status"
+                aria-live="polite">
+                Completa la receta para ver el consumo por unidad vendida.
+            </p>
+
+            <div class="modal-actions">
+                <button
+                    class="btn btn-secondary"
+                    type="button"
+                    data-inventory-cancel>
+                    Cancelar
+                </button>
+
+                <button class="btn btn-primary" type="submit">
+                    Guardar receta
+                </button>
+            </div>
+
+        </form>
+    </dialog>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="js/session.js"></script>
+    <script src="js/controllers/inventory.client.controller.js?v=receta-consumo-preview-2"></script>
+
+</body>
+</html>

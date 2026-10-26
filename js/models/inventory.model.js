@@ -1,56 +1,33 @@
-
 "use strict";
 
 const pool = require("../db");
 
-// ============================================================
-// CONSTANTES
-// ============================================================
-
 const TIPOS_PRODUCTO = new Set([
-    "insumo",
-    "botella",
-    "trago_preparado",
-    "servicio"
+    "insumo", "botella", "trago_preparado", "servicio"
 ]);
 
 const UNIDADES = new Set([
-    "unidad",
-    "ml",
-    "litro",
-    "gramo",
-    "kilogramo"
+    "unidad", "ml", "litro", "gramo", "kilogramo"
 ]);
 
-const TIPOS_MOVIMIENTO = new Set([
-    "entrada",
-    "salida",
-    "ajuste_entrada",
-    "ajuste_salida",
-    "devolucion"
+const POSITIVOS = new Set([
+    "entrada", "ajuste_entrada", "devolucion"
 ]);
 
-const MOVIMIENTOS_POSITIVOS = new Set([
-    "entrada",
-    "ajuste_entrada",
-    "devolucion"
+const NEGATIVOS = new Set([
+    "salida", "ajuste_salida"
 ]);
 
-const MOVIMIENTOS_NEGATIVOS = new Set([
-    "salida",
-    "ajuste_salida"
-]);
-
-const TIPOS_CON_INVENTARIO = new Set([
-    "insumo",
-    "botella"
-]);
+const TIPOS_MOVIMIENTO = new Set([...POSITIVOS, ...NEGATIVOS]);
+const TIPOS_CON_INVENTARIO = new Set(["insumo", "botella"]);
 
 const UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
+const EPSILON = 0.0001;
+
 // ============================================================
-// ERRORES Y VALIDACIONES
+// VALIDACIONES Y ERRORES
 // ============================================================
 
 function errorValidacion(mensaje, status = 400) {
@@ -60,10 +37,10 @@ function errorValidacion(mensaje, status = 400) {
     return error;
 }
 
-function validarUUID(valor, nombre, opciones = {}) {
+function validarUUID(valor, nombre, { opcional = false } = {}) {
     if (
-        (valor === undefined || valor === null || valor === "") &&
-        opciones.opcional
+        opcional &&
+        (valor === undefined || valor === null || valor === "")
     ) {
         return null;
     }
@@ -78,15 +55,10 @@ function validarUUID(valor, nombre, opciones = {}) {
 }
 
 function numero(valor, nombre, opciones = {}) {
-    if (
-        valor === undefined ||
-        valor === null ||
-        String(valor).trim() === ""
-    ) {
-        if (opciones.opcional) return null;
+    const { minimo, maximo, entero, opcional } = opciones;
 
-        if (opciones.permitirCeroVacio && valor === "") return 0;
-
+    if (valor === undefined || valor === null || String(valor).trim() === "") {
+        if (opcional) return null;
         throw errorValidacion(`${nombre} es obligatorio.`);
     }
 
@@ -96,28 +68,15 @@ function numero(valor, nombre, opciones = {}) {
         throw errorValidacion(`${nombre} debe ser un número válido.`);
     }
 
-    if (
-        opciones.minimo !== undefined &&
-        resultado < opciones.minimo
-    ) {
-        throw errorValidacion(
-            `${nombre} debe ser como mínimo ${opciones.minimo}.`
-        );
+    if (minimo !== undefined && resultado < minimo) {
+        throw errorValidacion(`${nombre} debe ser como mínimo ${minimo}.`);
     }
 
-    if (
-        opciones.maximo !== undefined &&
-        resultado > opciones.maximo
-    ) {
-        throw errorValidacion(
-            `${nombre} no puede superar ${opciones.maximo}.`
-        );
+    if (maximo !== undefined && resultado > maximo) {
+        throw errorValidacion(`${nombre} no puede superar ${maximo}.`);
     }
 
-    if (
-        opciones.entero &&
-        !Number.isInteger(resultado)
-    ) {
+    if (entero && !Number.isInteger(resultado)) {
         throw errorValidacion(`${nombre} debe ser un número entero.`);
     }
 
@@ -132,7 +91,7 @@ function texto(valor, nombre, opciones = {}) {
     }
 
     if (
-        opciones.maximo &&
+        opciones.maximo !== undefined &&
         resultado.length > opciones.maximo
     ) {
         throw errorValidacion(
@@ -154,7 +113,7 @@ function validarUnidadYTipo(tipo, unidad) {
 
     if (tipo === "botella" && unidad !== "ml") {
         throw errorValidacion(
-            'Los productos de tipo "botella" deben utilizar la unidad "ml".'
+            'Los productos de tipo "botella" deben utilizar "ml".'
         );
     }
 
@@ -163,26 +122,9 @@ function validarUnidadYTipo(tipo, unidad) {
         unidad !== "unidad"
     ) {
         throw errorValidacion(
-            'Los tragos preparados y servicios deben utilizar la unidad "unidad".'
+            'Los tragos preparados y servicios deben utilizar "unidad".'
         );
     }
-}
-
-function costoEnviado(datos, costoPredeterminado, nombre) {
-    const valor =
-        datos.costo_compra ??
-        datos.costo_unitario ??
-        datos.costo;
-
-    if (
-        valor === undefined ||
-        valor === null ||
-        String(valor).trim() === ""
-    ) {
-        return numero(costoPredeterminado, nombre, { minimo: 0 });
-    }
-
-    return numero(valor, nombre, { minimo: 0 });
 }
 
 function obtenerCategoriaId(datos, valorActual = null) {
@@ -190,66 +132,83 @@ function obtenerCategoriaId(datos, valorActual = null) {
         return valorActual;
     }
 
-    return validarUUID(
-        datos.categoria_id,
-        "La categoría",
-        { opcional: true }
+    return validarUUID(datos.categoria_id, "La categoría", {
+        opcional: true
+    });
+}
+
+function costoEnviado(datos, predeterminado, nombre) {
+    const valor =
+        datos.costo_compra ??
+        datos.costo_unitario ??
+        datos.costo;
+
+    return numero(
+        valor === undefined || valor === null || String(valor).trim() === ""
+            ? predeterminado
+            : valor,
+        nombre,
+        { minimo: 0 }
     );
 }
 
-// Convierte errores comunes de PostgreSQL en mensajes seguros.
-// El error original se registra en el servidor.
 function traducirErrorBD(error) {
     if (!error || error.esValidacion) return error;
 
-    switch (error.code) {
-        case "23505":
-            return errorValidacion(
-                "Ya existe un registro con esos datos.",
-                409
-            );
+    const errores = {
+        "23505": ["Ya existe un registro con esos datos.", 409],
+        "23503": [
+            "No se puede completar la operación porque el registro está relacionado con otros datos.",
+            409
+        ],
+        "23514": [
+            "Los datos enviados no cumplen las validaciones de la base de datos.",
+            400
+        ],
+        "22P02": [
+            "Los datos enviados tienen un formato no válido.",
+            400
+        ],
+        "22003": [
+            "Uno de los valores numéricos está fuera del rango permitido.",
+            400
+        ],
+        "22001": [
+            "Uno de los campos supera la longitud permitida.",
+            400
+        ],
+        "23502": ["Falta un dato obligatorio.", 400],
+        "40001": [
+            "La operación tuvo un conflicto de concurrencia. Inténtalo nuevamente.",
+            409
+        ],
+        "40P01": [
+            "La operación tuvo un conflicto de concurrencia. Inténtalo nuevamente.",
+            409
+        ],
+        ECONNREFUSED: [
+            "No fue posible comunicarse con la base de datos.",
+            503
+        ],
+        ECONNRESET: [
+            "Se perdió la conexión con la base de datos.",
+            503
+        ],
+        ETIMEDOUT: [
+            "La conexión con la base de datos agotó el tiempo de espera.",
+            503
+        ]
+    };
 
-        case "23503":
-            return errorValidacion(
-                "No se puede completar la operación porque el registro está relacionado con otros datos.",
-                409
-            );
+    const traducido = errores[error.code];
 
-        case "23514":
-        case "22P02":
-        case "22003":
-        case "22001":
-            return errorValidacion(
-                "Los datos enviados no cumplen las validaciones de la base de datos."
-            );
-
-        case "23502":
-            return errorValidacion(
-                "Falta un dato obligatorio para guardar el registro."
-            );
-
-        case "40001":
-        case "40P01":
-            return errorValidacion(
-                "La operación tuvo un conflicto de concurrencia. Inténtalo nuevamente.",
-                409
-            );
-
-        case "ECONNREFUSED":
-        case "ECONNRESET":
-        case "ETIMEDOUT":
-            return errorValidacion(
-                "No fue posible comunicarse con la base de datos. Inténtalo más tarde.",
-                503
-            );
-
-        default:
-            return error;
-    }
+    return traducido
+        ? errorValidacion(traducido[0], traducido[1])
+        : error;
 }
 
 // ============================================================
-// TRANSACCIONES
+// BASE DE DATOS
 // ============================================================
 
 async function transaccion(callback) {
@@ -261,47 +220,39 @@ async function transaccion(callback) {
         const resultado = await callback(client);
 
         await client.query("COMMIT");
-
         return resultado;
     } catch (error) {
         try {
             await client.query("ROLLBACK");
-        } catch (errorRollback) {
-            console.error(
-                "Error al revertir la transacción:",
-                errorRollback
-            );
+        } catch (rollbackError) {
+            console.error("Error al revertir la transacción:", rollbackError);
         }
 
-        const errorTraducido = traducirErrorBD(error);
+        const traducido = traducirErrorBD(error);
 
-        if (errorTraducido === error) {
-            console.error("Error en transacción de inventario:", error);
+        if (traducido === error) {
+            console.error("Error en inventario:", error);
         }
 
-        throw errorTraducido;
+        throw traducido;
     } finally {
         client.release();
     }
 }
 
-async function consultar(query, parametros = []) {
+async function consultar(sql, parametros = []) {
     try {
-        return await pool.query(query, parametros);
+        return await pool.query(sql, parametros);
     } catch (error) {
-        const errorTraducido = traducirErrorBD(error);
+        const traducido = traducirErrorBD(error);
 
-        if (errorTraducido === error) {
+        if (traducido === error) {
             console.error("Error en consulta de inventario:", error);
         }
 
-        throw errorTraducido;
+        throw traducido;
     }
 }
-
-// ============================================================
-// CONSULTAS AUXILIARES
-// ============================================================
 
 async function obtenerProductoBloqueado(client, productoId) {
     const id = validarUUID(productoId, "El producto");
@@ -320,11 +271,30 @@ async function obtenerProductoBloqueado(client, productoId) {
         [id]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
         throw errorValidacion("El producto solicitado no existe.", 404);
     }
 
     return rows[0];
+}
+
+async function validarProveedorActivo(client, proveedorId) {
+    if (!proveedorId) return;
+
+    const { rowCount } = await client.query(
+        `
+        SELECT proveedores_id
+        FROM catalogo.proveedores
+        WHERE proveedores_id = $1 AND activo = TRUE
+        `,
+        [proveedorId]
+    );
+
+    if (!rowCount) {
+        throw errorValidacion(
+            "El proveedor no existe o está inactivo."
+        );
+    }
 }
 
 async function productoTieneReferencias(client, productoId) {
@@ -332,28 +302,23 @@ async function productoTieneReferencias(client, productoId) {
         `
         SELECT
             EXISTS (
-                SELECT 1
-                FROM inventario.movimientos_stock
+                SELECT 1 FROM inventario.movimientos_stock
                 WHERE producto_id = $1
             )
             OR EXISTS (
-                SELECT 1
-                FROM inventario.envases
+                SELECT 1 FROM inventario.envases
                 WHERE producto_id = $1
             )
             OR EXISTS (
-                SELECT 1
-                FROM catalogo.receta_detalle
+                SELECT 1 FROM catalogo.receta_detalle
                 WHERE insumo_id = $1
             )
             OR EXISTS (
-                SELECT 1
-                FROM catalogo.recetas
+                SELECT 1 FROM catalogo.recetas
                 WHERE producto_id = $1
             )
             OR EXISTS (
-                SELECT 1
-                FROM ventas.venta_detalle
+                SELECT 1 FROM ventas.venta_detalle
                 WHERE producto_id = $1
             ) AS tiene_referencias
         `,
@@ -363,8 +328,27 @@ async function productoTieneReferencias(client, productoId) {
     return rows[0].tiene_referencias;
 }
 
+async function validarCategoriaActiva(client, categoriaId) {
+    if (!categoriaId) return;
+
+    const { rowCount } = await client.query(
+        `
+        SELECT categorias_id
+        FROM catalogo.categorias
+        WHERE categorias_id = $1 AND activo = TRUE
+        `,
+        [categoriaId]
+    );
+
+    if (!rowCount) {
+        throw errorValidacion(
+            "La categoría seleccionada no existe o está inactiva."
+        );
+    }
+}
+
 // ============================================================
-// RESUMEN
+// RESUMEN, CATEGORÍAS Y PROVEEDORES
 // ============================================================
 
 async function obtenerResumen() {
@@ -374,6 +358,7 @@ async function obtenerResumen() {
                 productos_id,
                 stock_actual,
                 stock_minimo,
+                tipo,
                 activo,
                 costo_promedio
             FROM inventario.v_stock_actual
@@ -389,6 +374,7 @@ async function obtenerResumen() {
                 SELECT COUNT(*)::INTEGER
                 FROM stock
                 WHERE activo = TRUE
+                  AND tipo IN ('insumo', 'botella')
                   AND stock_actual <= stock_minimo
             ) AS productos_bajo_minimo,
 
@@ -408,20 +394,16 @@ async function obtenerResumen() {
 
             (
                 SELECT COALESCE(
-                    SUM(stock_actual * COALESCE(costo_promedio, 0)),
-                    0
+                    SUM(stock_actual * COALESCE(costo_promedio, 0)), 0
                 )
                 FROM stock
                 WHERE activo = TRUE
+                  AND tipo IN ('insumo', 'botella')
             ) AS valor_inventario
     `);
 
     return rows[0];
 }
-
-// ============================================================
-// CATEGORÍAS Y PROVEEDORES
-// ============================================================
 
 async function obtenerCategorias() {
     const { rows } = await consultar(`
@@ -474,8 +456,7 @@ async function obtenerProductos() {
             COALESCE(s.stock_actual, 0) AS stock_actual,
 
             GREATEST(
-                p.stock_minimo - COALESCE(s.stock_actual, 0),
-                0
+                p.stock_minimo - COALESCE(s.stock_actual, 0), 0
             ) AS cantidad_sugerida,
 
             (
@@ -539,16 +520,20 @@ async function crearProducto(datos = {}) {
     });
 
     const tipo = texto(datos.tipo, "El tipo", { requerido: true });
-    const unidad = texto(
-        datos.unidad_medida,
-        "La unidad de medida",
-        { requerido: true }
-    );
+    const unidad = texto(datos.unidad_medida, "La unidad de medida", {
+        requerido: true
+    });
 
     validarUnidadYTipo(tipo, unidad);
 
+    if (tipo === "trago_preparado") {
+        throw errorValidacion(
+            "Los tragos preparados se crean desde la gestión de recetas."
+        );
+    }
+
     const precio = numero(datos.precio ?? 0, "El precio", { minimo: 0 });
-    const costoPromedio = numero(
+    const costo = numero(
         datos.costo_promedio ?? 0,
         "El costo promedio",
         { minimo: 0 }
@@ -561,50 +546,101 @@ async function crearProducto(datos = {}) {
     const categoriaId = obtenerCategoriaId(datos);
 
     return transaccion(async (client) => {
-        if (categoriaId) {
-            const categoria = await client.query(
-                `
-                SELECT categorias_id
-                FROM catalogo.categorias
-                WHERE categorias_id = $1 AND activo = TRUE
-                `,
-                [categoriaId]
-            );
-
-            if (categoria.rows.length === 0) {
-                throw errorValidacion(
-                    "La categoría seleccionada no existe o está inactiva."
-                );
-            }
-        }
+        await validarCategoriaActiva(client, categoriaId);
 
         const { rows } = await client.query(
             `
             INSERT INTO catalogo.productos (
-                categoria_id,
-                nombre,
-                tipo,
-                unidad_medida,
-                precio,
-                costo_promedio,
-                stock_minimo,
-                activo
+                categoria_id, nombre, tipo, unidad_medida,
+                precio, costo_promedio, stock_minimo, activo
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, TRUE)
             RETURNING *
             `,
             [
-                categoriaId,
-                nombre,
-                tipo,
-                unidad,
-                precio,
-                costoPromedio,
-                stockMinimo
+                categoriaId, nombre, tipo, unidad,
+                precio, costo, stockMinimo
             ]
         );
 
         return rows[0];
+    });
+}
+
+async function crearProductoConEntrada(datos = {}, usuarioId) {
+    const nombre = texto(datos.nombre, "El nombre", {
+        requerido: true,
+        maximo: 150
+    });
+    const tipo = texto(datos.tipo, "El tipo", { requerido: true });
+    const unidad = texto(datos.unidad_medida, "La unidad de medida", {
+        requerido: true
+    });
+
+    validarUnidadYTipo(tipo, unidad);
+
+    if (!TIPOS_CON_INVENTARIO.has(tipo)) {
+        throw errorValidacion(
+            "El producto nuevo debe ser un insumo o una botella."
+        );
+    }
+
+    const precio = numero(datos.precio ?? 0, "El precio", { minimo: 0 });
+    const stockMinimo = numero(
+        datos.stock_minimo ?? 0,
+        "El stock mínimo",
+        { minimo: 0 }
+    );
+    const categoriaId = obtenerCategoriaId(datos);
+    const idUsuario = validarUUID(usuarioId, "El usuario");
+
+    return transaccion(async (client) => {
+        await validarCategoriaActiva(client, categoriaId);
+
+        const { rows } = await client.query(
+            `
+            INSERT INTO catalogo.productos (
+                categoria_id, nombre, tipo, unidad_medida,
+                precio, costo_promedio, stock_minimo, activo
+            )
+            VALUES ($1, $2, $3, $4, $5, 0, $6, TRUE)
+            RETURNING *
+            `,
+            [
+                categoriaId, nombre, tipo, unidad,
+                precio, stockMinimo
+            ]
+        );
+
+        const productoId = rows[0].productos_id;
+        const movimiento = prepararMovimiento({
+            ...datos,
+            producto_id: productoId,
+            tipo: "entrada"
+        });
+        const producto = await obtenerProductoBloqueado(
+            client,
+            productoId
+        );
+        const resultadoMovimiento = await ejecutarMovimiento(
+            client,
+            movimiento,
+            idUsuario,
+            producto
+        );
+        const { rows: productoActualizado } = await client.query(
+            `
+            SELECT *
+            FROM catalogo.productos
+            WHERE productos_id = $1
+            `,
+            [productoId]
+        );
+
+        return {
+            producto: productoActualizado[0],
+            movimiento: resultadoMovimiento
+        };
     });
 }
 
@@ -614,21 +650,18 @@ async function actualizarProducto(productoId, datos = {}) {
     return transaccion(async (client) => {
         const actual = await obtenerProductoBloqueado(client, id);
 
-        const nombre = Object.prototype.hasOwnProperty.call(datos, "nombre")
+        const nombre = Object.hasOwn(datos, "nombre")
             ? texto(datos.nombre, "El nombre", {
                 requerido: true,
                 maximo: 150
             })
             : actual.nombre;
 
-        const tipo = Object.prototype.hasOwnProperty.call(datos, "tipo")
+        const tipo = Object.hasOwn(datos, "tipo")
             ? texto(datos.tipo, "El tipo", { requerido: true })
             : actual.tipo;
 
-        const unidad = Object.prototype.hasOwnProperty.call(
-            datos,
-            "unidad_medida"
-        )
+        const unidad = Object.hasOwn(datos, "unidad_medida")
             ? texto(datos.unidad_medida, "La unidad de medida", {
                 requerido: true
             })
@@ -636,12 +669,13 @@ async function actualizarProducto(productoId, datos = {}) {
 
         validarUnidadYTipo(tipo, unidad);
 
-        if (tipo !== actual.tipo || unidad !== actual.unidad_medida) {
-            if (await productoTieneReferencias(client, id)) {
-                throw errorValidacion(
-                    "No se puede cambiar el tipo o la unidad de un producto que ya tiene movimientos, envases, recetas o ventas."
-                );
-            }
+        if (
+            (tipo !== actual.tipo || unidad !== actual.unidad_medida) &&
+            await productoTieneReferencias(client, id)
+        ) {
+            throw errorValidacion(
+                "No se puede cambiar el tipo o la unidad de un producto que ya tiene movimientos, envases, recetas o ventas."
+            );
         }
 
         const precio = numero(
@@ -649,40 +683,30 @@ async function actualizarProducto(productoId, datos = {}) {
             "El precio",
             { minimo: 0 }
         );
-        const costoPromedio = numero(
+
+        const costo = numero(
             datos.costo_promedio ?? actual.costo_promedio,
             "El costo promedio",
             { minimo: 0 }
         );
+
         const stockMinimo = numero(
             datos.stock_minimo ?? actual.stock_minimo,
             "El stock mínimo",
             { minimo: 0 }
         );
-        const categoriaId = obtenerCategoriaId(datos, actual.categoria_id);
 
-        if (categoriaId) {
-            const categoria = await client.query(
-                `
-                SELECT categorias_id
-                FROM catalogo.categorias
-                WHERE categorias_id = $1 AND activo = TRUE
-                `,
-                [categoriaId]
-            );
+        const categoriaId = obtenerCategoriaId(
+            datos,
+            actual.categoria_id
+        );
 
-            if (categoria.rows.length === 0) {
-                throw errorValidacion(
-                    "La categoría seleccionada no existe o está inactiva."
-                );
-            }
-        }
+        await validarCategoriaActiva(client, categoriaId);
 
         const { rows } = await client.query(
             `
             UPDATE catalogo.productos
-            SET
-                categoria_id = $2,
+            SET categoria_id = $2,
                 nombre = $3,
                 tipo = $4,
                 unidad_medida = $5,
@@ -694,14 +718,8 @@ async function actualizarProducto(productoId, datos = {}) {
             RETURNING *
             `,
             [
-                id,
-                categoriaId,
-                nombre,
-                tipo,
-                unidad,
-                precio,
-                costoPromedio,
-                stockMinimo
+                id, categoriaId, nombre, tipo,
+                unidad, precio, costo, stockMinimo
             ]
         );
 
@@ -719,14 +737,15 @@ async function cambiarEstadoProducto(productoId, activo) {
     const { rows } = await consultar(
         `
         UPDATE catalogo.productos
-        SET activo = $2, updated_at = NOW()
+        SET activo = $2,
+            updated_at = NOW()
         WHERE productos_id = $1
         RETURNING *
         `,
         [id, activo]
     );
 
-    if (rows.length === 0) {
+    if (!rows.length) {
         throw errorValidacion("El producto solicitado no existe.", 404);
     }
 
@@ -769,10 +788,11 @@ async function obtenerEnvases(productoId = null) {
                 WHEN 'abierta' THEN 0
                 WHEN 'cerrada' THEN 1
                 WHEN 'vacia' THEN 2
-                ELSE 3
+                WHEN 'vendida' THEN 3
+                ELSE 4
             END,
-            e.contenido_actual_ml ASC,
-            e.created_at ASC
+            e.contenido_actual_ml,
+            e.created_at
         `,
         [id]
     );
@@ -789,7 +809,7 @@ async function registrarMovimientoBotella(
     datos,
     usuarioId,
     producto,
-    tipoMovimiento,
+    tipo,
     cantidad,
     proveedorId,
     observacion
@@ -802,176 +822,150 @@ async function registrarMovimientoBotella(
         );
     }
 
-    if (MOVIMIENTOS_POSITIVOS.has(tipoMovimiento)) {
+    if (POSITIVOS.has(tipo)) {
         if (!Number.isInteger(cantidad)) {
             throw errorValidacion(
                 "La cantidad de envases que ingresan debe ser un número entero."
             );
         }
 
-        const contenidoInicial = numero(
+        const contenido = numero(
             datos.contenido_inicial_ml,
             "El contenido inicial de cada botella",
             { minimo: Number.EPSILON }
         );
 
         const stockAnterior = Number(producto.stock_actual || 0);
-        const costoPromedioAnterior = Number(
-            producto.costo_promedio || 0
-        );
-
-        const costoPorEnvase = costoEnviado(
+        const costoAnterior = Number(producto.costo_promedio || 0);
+        const costoEnvase = costoEnviado(
             datos,
-            costoPromedioAnterior * contenidoInicial,
+            costoAnterior * contenido,
             "El costo de cada botella"
         );
-
-        const costoPorMl = costoPorEnvase / contenidoInicial;
-
-        if (!Number.isFinite(costoPorMl)) {
-            throw errorValidacion("No se pudo calcular el costo por mililitro.");
-        }
-
+        const costoMl = costoEnvase / contenido;
         const movimientos = [];
-        const cantidadTotalMl = cantidad * contenidoInicial;
 
         for (let i = 0; i < cantidad; i += 1) {
-            const { rows: envaseRows } = await client.query(
+            const { rows: envases } = await client.query(
                 `
                 INSERT INTO inventario.envases (
-                    producto_id,
-                    proveedor_id,
-                    contenido_inicial_ml,
-                    contenido_actual_ml,
-                    estado,
-                    costo_compra,
-                    observacion
+                    producto_id, proveedor_id,
+                    contenido_inicial_ml, contenido_actual_ml,
+                    estado, costo_compra, observacion
                 )
                 VALUES ($1, $2, $3, $3, 'cerrada', $4, $5)
                 RETURNING envases_id
                 `,
                 [
-                    productoId,
-                    proveedorId,
-                    contenidoInicial,
-                    costoPorEnvase,
-                    observacion
+                    productoId, proveedorId, contenido,
+                    costoEnvase, observacion
                 ]
             );
 
-            const envaseId = envaseRows[0].envases_id;
-
-            const { rows: movimientoRows } = await client.query(
+            const { rows } = await client.query(
                 `
                 INSERT INTO inventario.movimientos_stock (
-                    producto_id,
-                    usuario_id,
-                    proveedor_id,
-                    envase_id,
-                    tipo,
-                    cantidad,
-                    costo,
-                    observacion
+                    producto_id, usuario_id, proveedor_id,
+                    envase_id, tipo, cantidad, costo, observacion
                 )
                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                 RETURNING *
                 `,
                 [
                     productoId,
-                    usuarioId || null,
+                    usuarioId,
                     proveedorId,
-                    envaseId,
-                    tipoMovimiento,
-                    contenidoInicial,
-                    costoPorMl,
+                    envases[0].envases_id,
+                    tipo,
+                    contenido,
+                    costoMl,
                     observacion
                 ]
             );
 
-            movimientos.push(movimientoRows[0]);
+            movimientos.push(rows[0]);
         }
 
-        const nuevoStock = stockAnterior + cantidadTotalMl;
-        const nuevoCostoPromedio = nuevoStock > 0
+        const stockNuevo = stockAnterior + cantidad * contenido;
+        const costoNuevo = stockNuevo > 0
             ? (
-                stockAnterior * costoPromedioAnterior +
-                cantidadTotalMl * costoPorMl
-            ) / nuevoStock
-            : costoPorMl;
+                stockAnterior * costoAnterior +
+                cantidad * contenido * costoMl
+            ) / stockNuevo
+            : costoMl;
 
         await client.query(
             `
             UPDATE catalogo.productos
-            SET costo_promedio = $2, updated_at = NOW()
+            SET costo_promedio = $2,
+                updated_at = NOW()
             WHERE productos_id = $1
             `,
-            [productoId, nuevoCostoPromedio]
+            [productoId, costoNuevo]
         );
 
         return {
             producto_id: productoId,
-            tipo: tipoMovimiento,
+            tipo,
             envases_registrados: cantidad,
-            cantidad_ml: cantidadTotalMl,
+            cantidad_ml: cantidad * contenido,
             movimientos
         };
     }
 
-    if (!MOVIMIENTOS_NEGATIVOS.has(tipoMovimiento)) {
+    if (!NEGATIVOS.has(tipo)) {
         throw errorValidacion(
             "El tipo de movimiento no está permitido para botellas."
         );
     }
 
-    const stockDisponible = Number(producto.stock_actual || 0);
-
-    if (stockDisponible + 0.0001 < cantidad) {
-        throw errorValidacion(
-            `Contenido insuficiente. Disponible: ${stockDisponible} ml; solicitado: ${cantidad} ml.`
-        );
-    }
-
-    let restante = cantidad;
-
     const { rows: envases } = await client.query(
         `
-        SELECT
-            envases_id,
-            contenido_actual_ml,
-            estado
+        SELECT envases_id, contenido_actual_ml, estado
         FROM inventario.envases
         WHERE producto_id = $1
           AND estado IN ('abierta', 'cerrada')
           AND contenido_actual_ml > 0
         ORDER BY
             CASE WHEN estado = 'abierta' THEN 0 ELSE 1 END,
-            contenido_actual_ml ASC,
-            created_at ASC,
-            envases_id ASC
+            contenido_actual_ml,
+            created_at,
+            envases_id
         FOR UPDATE
         `,
         [productoId]
     );
 
+    const disponible = envases.reduce(
+        (suma, e) => suma + Number(e.contenido_actual_ml),
+        0
+    );
+
+    if (disponible + EPSILON < cantidad) {
+        throw errorValidacion(
+            `Contenido insuficiente. Disponible: ${disponible} ml; solicitado: ${cantidad} ml.`
+        );
+    }
+
+    let restante = cantidad;
     const movimientos = [];
 
     for (const envase of envases) {
-        if (restante <= 0.0000001) break;
+        if (restante <= 0) break;
 
-        const disponible = Number(envase.contenido_actual_ml);
-        const descontar = Math.min(restante, disponible);
+        const contenido = Number(envase.contenido_actual_ml);
+        const descontar = Math.min(restante, contenido);
 
         await client.query(
             `
             UPDATE inventario.envases
             SET
-                contenido_actual_ml = GREATEST(
-                    contenido_actual_ml - $2,
-                    0
-                ),
+                contenido_actual_ml = CASE
+                    WHEN contenido_actual_ml <= $2 THEN 0
+                    ELSE contenido_actual_ml - $2
+                END,
                 estado = CASE
-                    WHEN contenido_actual_ml - $2 <= 0
-                        THEN 'vacia'
+                    WHEN contenido_actual_ml <= $2 THEN 'vacia'
                     ELSE 'abierta'
                 END,
                 fecha_apertura = COALESCE(fecha_apertura, NOW()),
@@ -981,38 +975,32 @@ async function registrarMovimientoBotella(
             [envase.envases_id, descontar]
         );
 
-        const { rows: movimientoRows } = await client.query(
+        const { rows } = await client.query(
             `
             INSERT INTO inventario.movimientos_stock (
-                producto_id,
-                usuario_id,
-                proveedor_id,
-                envase_id,
-                tipo,
-                cantidad,
-                costo,
-                observacion
+                producto_id, usuario_id, proveedor_id,
+                envase_id, tipo, cantidad, costo, observacion
             )
             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *
             `,
             [
                 productoId,
-                usuarioId || null,
+                usuarioId,
                 proveedorId,
                 envase.envases_id,
-                tipoMovimiento,
+                tipo,
                 descontar,
                 Number(producto.costo_promedio || 0),
                 observacion
             ]
         );
 
-        movimientos.push(movimientoRows[0]);
+        movimientos.push(rows[0]);
         restante -= descontar;
     }
 
-    if (restante > 0.0001) {
+    if (restante > EPSILON) {
         throw errorValidacion(
             "No fue posible completar la salida con el contenido disponible."
         );
@@ -1020,7 +1008,7 @@ async function registrarMovimientoBotella(
 
     return {
         producto_id: productoId,
-        tipo: tipoMovimiento,
+        tipo,
         cantidad_ml: cantidad,
         movimientos
     };
@@ -1035,30 +1023,37 @@ async function registrarMovimientoInsumo(
     datos,
     usuarioId,
     producto,
-    tipoMovimiento,
+    tipo,
     cantidad,
     proveedorId,
     observacion
 ) {
-    const productoId = producto.productos_id;
-
     if (producto.tipo !== "insumo") {
         throw errorValidacion(
             "Solo los productos de tipo insumo admiten movimientos ordinarios."
         );
     }
 
-    const stockActual = Number(producto.stock_actual || 0);
-    const esPositivo = MOVIMIENTOS_POSITIVOS.has(tipoMovimiento);
-    const esNegativo = MOVIMIENTOS_NEGATIVOS.has(tipoMovimiento);
+    if (
+        producto.unidad_medida === "unidad" &&
+        !Number.isInteger(cantidad)
+    ) {
+        throw errorValidacion(
+            "La cantidad debe ser entera cuando la unidad de medida es unidad."
+        );
+    }
+
+    const stock = Number(producto.stock_actual || 0);
+    const esPositivo = POSITIVOS.has(tipo);
+    const esNegativo = NEGATIVOS.has(tipo);
 
     if (!esPositivo && !esNegativo) {
         throw errorValidacion("El tipo de movimiento no está permitido.");
     }
 
-    if (esNegativo && stockActual + 0.0001 < cantidad) {
+    if (esNegativo && stock + EPSILON < cantidad) {
         throw errorValidacion(
-            `Existencias insuficientes. Disponible: ${stockActual} ${producto.unidad_medida}; solicitado: ${cantidad} ${producto.unidad_medida}.`
+            `Existencias insuficientes. Disponible: ${stock} ${producto.unidad_medida}; solicitado: ${cantidad} ${producto.unidad_medida}.`
         );
     }
 
@@ -1073,22 +1068,17 @@ async function registrarMovimientoInsumo(
     const { rows } = await client.query(
         `
         INSERT INTO inventario.movimientos_stock (
-            producto_id,
-            usuario_id,
-            proveedor_id,
-            tipo,
-            cantidad,
-            costo,
-            observacion
+            producto_id, usuario_id, proveedor_id,
+            tipo, cantidad, costo, observacion
         )
         VALUES ($1, $2, $3, $4, $5, $6, $7)
         RETURNING *
         `,
         [
-            productoId,
-            usuarioId || null,
+            producto.productos_id,
+            usuarioId,
             proveedorId,
-            tipoMovimiento,
+            tipo,
             cantidad,
             costo,
             observacion
@@ -1096,134 +1086,172 @@ async function registrarMovimientoInsumo(
     );
 
     if (esPositivo) {
-        const nuevoStock = stockActual + cantidad;
+        const stockNuevo = stock + cantidad;
         const costoAnterior = Number(producto.costo_promedio || 0);
 
-        const nuevoCostoPromedio = nuevoStock > 0
+        const costoNuevo = stockNuevo > 0
             ? (
-                stockActual * costoAnterior +
-                cantidad * costo
-            ) / nuevoStock
+                stock * costoAnterior + cantidad * costo
+            ) / stockNuevo
             : costo;
 
         await client.query(
             `
             UPDATE catalogo.productos
-            SET costo_promedio = $2, updated_at = NOW()
+            SET costo_promedio = $2,
+                updated_at = NOW()
             WHERE productos_id = $1
             `,
-            [productoId, nuevoCostoPromedio]
+            [producto.productos_id, costoNuevo]
         );
     }
 
     return rows[0];
 }
 
-async function registrarMovimiento(datos = {}, usuarioId) {
-    const productoId = validarUUID(
-        datos.producto_id,
-        "El producto"
-    );
+function prepararMovimiento(datos = {}) {
+    const productoId = validarUUID(datos.producto_id, "El producto");
+    const tipo = texto(datos.tipo, "El tipo de movimiento", {
+        requerido: true
+    });
 
-    const tipoMovimiento = texto(
-        datos.tipo,
-        "El tipo de movimiento",
-        { requerido: true }
-    );
-
-    if (!TIPOS_MOVIMIENTO.has(tipoMovimiento)) {
+    if (!TIPOS_MOVIMIENTO.has(tipo)) {
         throw errorValidacion("El tipo de movimiento no está permitido.");
     }
 
-    const cantidad = numero(
-        datos.cantidad,
-        "La cantidad",
-        { minimo: Number.EPSILON }
-    );
-
+    const entrada = tipo === "entrada";
+    const cajas = entrada
+        ? numero(datos.cajas, "La cantidad de cajas", {
+            minimo: 1,
+            maximo: 999999999,
+            entero: true
+        })
+        : null;
+    const unidadesPorCaja = entrada
+        ? numero(datos.unidades_por_caja, "Las unidades por caja", {
+            minimo: 1,
+            maximo: 999999999,
+            entero: true
+        })
+        : null;
+    const cantidad = entrada
+        ? numero(cajas * unidadesPorCaja, "El total de unidades", {
+            minimo: 1,
+            maximo: 999999999,
+            entero: true
+        })
+        : numero(datos.cantidad, "La cantidad", {
+            minimo: Number.EPSILON
+        });
     const proveedorId = validarUUID(
         datos.proveedor_id,
         "El proveedor",
-        { opcional: true }
+        { opcional: !entrada }
     );
+    const nota = texto(datos.observacion, "La observación", {
+        maximo: 1000
+    });
+    const costoPorCaja = entrada
+        ? numero(datos.costo_por_caja, "El costo por caja", {
+            minimo: 0
+        })
+        : null;
+    const costoUnitario = entrada
+        ? costoPorCaja / unidadesPorCaja
+        : null;
 
-    const observacion = texto(
-        datos.observacion,
-        "La observación",
-        { maximo: 1000 }
-    );
+    if (entrada && !Number.isFinite(costoUnitario)) {
+        throw errorValidacion("El costo por caja no es válido.");
+    }
 
+    const observacion = entrada
+        ? `Compra: ${cajas} cajas × ${unidadesPorCaja} unidades/caja = ${cantidad} unidades; costo por caja: $${costoPorCaja.toFixed(2)}.${nota ? ` ${nota}` : ""}`
+        : nota;
+    const datosMovimiento = entrada
+        ? {
+            ...datos,
+            costo_compra: costoUnitario,
+            costo_unitario: costoUnitario,
+            costo: costoUnitario
+        }
+        : datos;
+
+    return {
+        productoId,
+        tipo,
+        cantidad,
+        proveedorId,
+        observacion,
+        datos: datosMovimiento
+    };
+}
+
+async function ejecutarMovimiento(client, movimiento, usuarioId, producto) {
+    const {
+        tipo,
+        cantidad,
+        proveedorId,
+        observacion,
+        datos
+    } = movimiento;
+
+    await validarProveedorActivo(client, proveedorId);
+
+    if (!producto.activo) {
+        throw errorValidacion(
+            "No se pueden registrar movimientos para un producto inactivo."
+        );
+    }
+
+    if (!TIPOS_CON_INVENTARIO.has(producto.tipo)) {
+        throw errorValidacion(
+            "Los tragos preparados y servicios no admiten movimientos manuales."
+        );
+    }
+
+    const argumentos = [
+        client,
+        datos,
+        usuarioId,
+        producto,
+        tipo,
+        cantidad,
+        proveedorId,
+        observacion
+    ];
+
+    return producto.tipo === "botella"
+        ? registrarMovimientoBotella(...argumentos)
+        : registrarMovimientoInsumo(...argumentos);
+}
+
+async function registrarMovimiento(datos = {}, usuarioId) {
+    const movimiento = prepararMovimiento(datos);
     const idUsuario = usuarioId
         ? validarUUID(usuarioId, "El usuario")
         : null;
 
     return transaccion(async (client) => {
-        if (proveedorId) {
-            const proveedor = await client.query(
-                `
-                SELECT proveedores_id
-                FROM catalogo.proveedores
-                WHERE proveedores_id = $1 AND activo = TRUE
-                `,
-                [proveedorId]
-            );
-
-            if (proveedor.rows.length === 0) {
-                throw errorValidacion(
-                    "El proveedor no existe o está inactivo."
-                );
-            }
-        }
-
         const producto = await obtenerProductoBloqueado(
             client,
-            productoId
+            movimiento.productoId
         );
 
-        if (!producto.activo) {
-            throw errorValidacion(
-                "No se pueden registrar movimientos para un producto inactivo."
-            );
-        }
-
-        if (!TIPOS_CON_INVENTARIO.has(producto.tipo)) {
-            throw errorValidacion(
-                "Los tragos preparados y servicios no admiten movimientos manuales."
-            );
-        }
-
-        if (producto.tipo === "botella") {
-            return registrarMovimientoBotella(
-                client,
-                datos,
-                idUsuario,
-                producto,
-                tipoMovimiento,
-                cantidad,
-                proveedorId,
-                observacion
-            );
-        }
-
-        return registrarMovimientoInsumo(
+        return ejecutarMovimiento(
             client,
-            datos,
+            movimiento,
             idUsuario,
-            producto,
-            tipoMovimiento,
-            cantidad,
-            proveedorId,
-            observacion
+            producto
         );
     });
 }
 
 // ============================================================
-// RECETAS: VALIDACIÓN E INGREDIENTES
+// RECETAS
 // ============================================================
 
 function normalizarIngredientes(ingredientes) {
-    if (!Array.isArray(ingredientes) || ingredientes.length === 0) {
+    if (!Array.isArray(ingredientes) || !ingredientes.length) {
         throw errorValidacion(
             "La receta debe tener al menos un ingrediente."
         );
@@ -1231,40 +1259,31 @@ function normalizarIngredientes(ingredientes) {
 
     const vistos = new Set();
 
-    return ingredientes.map((ingrediente, indice) => {
-        if (!ingrediente || typeof ingrediente !== "object") {
+    return ingredientes.map((item, i) => {
+        if (!item || typeof item !== "object") {
             throw errorValidacion(
-                `El ingrediente de la fila ${indice + 1} no es válido.`
+                `El ingrediente de la fila ${i + 1} no es válido.`
             );
         }
 
-        const productoId = validarUUID(
-            ingrediente.insumo_id || ingrediente.producto_id,
-            `El producto ingrediente de la fila ${indice + 1}`
+        const id = validarUUID(
+            item.insumo_id || item.producto_id,
+            `El producto ingrediente de la fila ${i + 1}`
         );
 
-        const clave = productoId.toLowerCase();
-
-        if (vistos.has(clave)) {
+        if (vistos.has(id.toLowerCase())) {
             throw errorValidacion(
                 "No repitas el mismo producto en una receta. Suma sus cantidades."
             );
         }
 
-        vistos.add(clave);
+        vistos.add(id.toLowerCase());
 
         return {
-            insumo_id: productoId,
-            cantidad: numero(
-                ingrediente.cantidad,
-                `La cantidad del ingrediente ${indice + 1}`,
-                { minimo: Number.EPSILON }
-            ),
-            desperdicio: numero(
-                ingrediente.desperdicio ?? 0,
-                `El desperdicio del ingrediente ${indice + 1}`,
-                { minimo: 0, maximo: 100 }
-            )
+            insumo_id: id,
+            cantidad: numero(item.cantidad, `La cantidad del ingrediente ${i + 1}`, {
+                minimo: Number.EPSILON
+            })
         };
     });
 }
@@ -1281,7 +1300,7 @@ async function validarIngredientes(client, ingredientes) {
             [ingrediente.insumo_id]
         );
 
-        if (rows.length === 0) {
+        if (!rows.length) {
             throw errorValidacion(
                 "Uno de los ingredientes seleccionados no existe."
             );
@@ -1313,30 +1332,22 @@ async function validarIngredientes(client, ingredientes) {
 }
 
 async function insertarIngredientes(client, recetaId, ingredientes) {
-    for (const ingrediente of ingredientes) {
+    for (const item of ingredientes) {
         await client.query(
             `
             INSERT INTO catalogo.receta_detalle (
-                receta_id,
-                insumo_id,
-                cantidad,
-                desperdicio
+                receta_id, insumo_id, cantidad
             )
-            VALUES ($1, $2, $3, $4)
+            VALUES ($1, $2, $3)
             `,
             [
                 recetaId,
-                ingrediente.insumo_id,
-                ingrediente.cantidad,
-                ingrediente.desperdicio
+                item.insumo_id,
+                item.cantidad
             ]
         );
     }
 }
-
-// ============================================================
-// CONSULTAR RECETAS
-// ============================================================
 
 async function obtenerRecetas() {
     const { rows } = await consultar(`
@@ -1346,7 +1357,6 @@ async function obtenerRecetas() {
             p.nombre AS producto,
             p.activo AS producto_activo,
             r.descripcion,
-            r.rendimiento,
             r.activa,
             r.created_at,
             r.updated_at,
@@ -1360,8 +1370,7 @@ async function obtenerRecetas() {
                             'nombre', pi.nombre,
                             'tipo', pi.tipo,
                             'unidad_medida', pi.unidad_medida,
-                            'cantidad', rd.cantidad,
-                            'desperdicio', rd.desperdicio
+                            'cantidad', rd.cantidad
                         )
                         ORDER BY pi.nombre
                     )
@@ -1382,32 +1391,80 @@ async function obtenerRecetas() {
     return rows;
 }
 
-// ============================================================
-// CREAR RECETA
-// ============================================================
-
 async function crearReceta(datos = {}) {
-    const productoId = validarUUID(
-        datos.producto_id,
-        "El producto preparado"
-    );
+    const productoNuevo = datos.producto_nuevo;
+    let productoId = null;
 
-    const descripcion = texto(
-        datos.descripcion,
-        "La descripción",
-        { maximo: 1000 }
-    );
+    if (productoNuevo !== undefined && productoNuevo !== null) {
+        if (
+            typeof productoNuevo !== "object" ||
+            Array.isArray(productoNuevo)
+        ) {
+            throw errorValidacion(
+                "Los datos del nuevo trago preparado no son válidos."
+            );
+        }
 
-    const rendimiento = numero(
-        datos.rendimiento,
-        "El rendimiento",
-        { minimo: Number.EPSILON }
-    );
+        productoNuevo.nombre = texto(
+            productoNuevo.nombre,
+            "El nombre del trago preparado",
+            { requerido: true, maximo: 150 }
+        );
+        productoNuevo.categoria_id = validarUUID(
+            productoNuevo.categoria_id,
+            "La categoría del trago preparado"
+        );
+        productoNuevo.precio = numero(
+            productoNuevo.precio,
+            "El precio del trago preparado",
+            { minimo: 0 }
+        );
+    } else {
+        productoId = validarUUID(
+            datos.producto_id,
+            "El producto preparado"
+        );
+    }
+
+    const descripcion = texto(datos.descripcion, "La descripción", {
+        maximo: 1000
+    });
 
     const ingredientes = normalizarIngredientes(datos.ingredientes);
 
     return transaccion(async (client) => {
-        const { rows: productoRows } = await client.query(
+        if (productoNuevo) {
+            await validarCategoriaActiva(
+                client,
+                productoNuevo.categoria_id
+            );
+
+            const { rows: productos } = await client.query(
+                `
+                INSERT INTO catalogo.productos (
+                    categoria_id,
+                    nombre,
+                    tipo,
+                    unidad_medida,
+                    precio,
+                    costo_promedio,
+                    stock_minimo,
+                    activo
+                )
+                VALUES ($1, $2, 'trago_preparado', 'unidad', $3, 0, 0, TRUE)
+                RETURNING productos_id
+                `,
+                [
+                    productoNuevo.categoria_id,
+                    productoNuevo.nombre,
+                    productoNuevo.precio
+                ]
+            );
+
+            productoId = productos[0].productos_id;
+        }
+
+        const { rows } = await client.query(
             `
             SELECT productos_id, nombre, tipo, activo
             FROM catalogo.productos
@@ -1417,14 +1474,14 @@ async function crearReceta(datos = {}) {
             [productoId]
         );
 
-        if (productoRows.length === 0) {
+        if (!rows.length) {
             throw errorValidacion(
                 "El producto preparado no existe.",
                 404
             );
         }
 
-        const producto = productoRows[0];
+        const producto = rows[0];
 
         if (producto.tipo !== "trago_preparado") {
             throw errorValidacion(
@@ -1449,28 +1506,25 @@ async function crearReceta(datos = {}) {
             [productoId]
         );
 
-        if (existente.rows.length > 0) {
+        if (existente.rowCount) {
             throw errorValidacion(
                 "Este producto ya tiene una receta. Utiliza la opción de editar.",
                 409
             );
         }
 
-        const { rows } = await client.query(
+        const { rows: recetas } = await client.query(
             `
             INSERT INTO catalogo.recetas (
-                producto_id,
-                descripcion,
-                rendimiento,
-                activa
+                producto_id, descripcion, activa
             )
-            VALUES ($1, $2, $3, TRUE)
+            VALUES ($1, $2, TRUE)
             RETURNING *
             `,
-            [productoId, descripcion, rendimiento]
+            [productoId, descripcion]
         );
 
-        const receta = rows[0];
+        const receta = recetas[0];
 
         await insertarIngredientes(
             client,
@@ -1482,24 +1536,12 @@ async function crearReceta(datos = {}) {
     });
 }
 
-// ============================================================
-// ACTUALIZAR RECETA
-// ============================================================
-
 async function actualizarReceta(recetaId, datos = {}) {
     const id = validarUUID(recetaId, "La receta");
 
-    const descripcion = texto(
-        datos.descripcion,
-        "La descripción",
-        { maximo: 1000 }
-    );
-
-    const rendimiento = numero(
-        datos.rendimiento,
-        "El rendimiento",
-        { minimo: Number.EPSILON }
-    );
+    const descripcion = texto(datos.descripcion, "La descripción", {
+        maximo: 1000
+    });
 
     const ingredientes = normalizarIngredientes(datos.ingredientes);
 
@@ -1519,8 +1561,11 @@ async function actualizarReceta(recetaId, datos = {}) {
             [id]
         );
 
-        if (rows.length === 0) {
-            throw errorValidacion("La receta solicitada no existe.", 404);
+        if (!rows.length) {
+            throw errorValidacion(
+                "La receta solicitada no existe.",
+                404
+            );
         }
 
         const receta = rows[0];
@@ -1543,11 +1588,10 @@ async function actualizarReceta(recetaId, datos = {}) {
             `
             UPDATE catalogo.recetas
             SET descripcion = $2,
-                rendimiento = $3,
                 updated_at = NOW()
             WHERE recetas_id = $1
             `,
-            [id, descripcion, rendimiento]
+            [id, descripcion]
         );
 
         await client.query(
@@ -1564,15 +1608,10 @@ async function actualizarReceta(recetaId, datos = {}) {
             recetas_id: id,
             producto_id: receta.producto_id,
             descripcion,
-            rendimiento,
             activa: receta.activa
         };
     });
 }
-
-// ============================================================
-// DESACTIVAR RECETA
-// ============================================================
 
 async function desactivarReceta(recetaId) {
     const id = validarUUID(recetaId, "La receta");
@@ -1580,15 +1619,19 @@ async function desactivarReceta(recetaId) {
     const { rows } = await consultar(
         `
         UPDATE catalogo.recetas
-        SET activa = FALSE, updated_at = NOW()
+        SET activa = FALSE,
+            updated_at = NOW()
         WHERE recetas_id = $1
         RETURNING *
         `,
         [id]
     );
 
-    if (rows.length === 0) {
-        throw errorValidacion("La receta solicitada no existe.", 404);
+    if (!rows.length) {
+        throw errorValidacion(
+            "La receta solicitada no existe.",
+            404
+        );
     }
 
     return rows[0];
@@ -1605,6 +1648,7 @@ module.exports = {
 
     obtenerProductos,
     crearProducto,
+    crearProductoConEntrada,
     actualizarProducto,
     cambiarEstadoProducto,
 

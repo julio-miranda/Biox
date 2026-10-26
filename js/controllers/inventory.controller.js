@@ -444,6 +444,33 @@ async function crearProducto(req, res) {
     );
 }
 
+async function crearProductoConEntrada(req, res) {
+    const usuarioId = obtenerIdUsuario(req);
+
+    if (!usuarioId || !esUuidValido(usuarioId)) {
+        return res.status(401).json({
+            ok: false,
+            mensaje:
+                "No se pudo identificar al usuario de la sesión. Inicia sesión nuevamente."
+        });
+    }
+
+    const cuerpo = obtenerCuerpo(req, res);
+
+    if (cuerpo === null) {
+        return;
+    }
+
+    return ejecutar(
+        res,
+        () => inventoryModel.crearProductoConEntrada(
+            cuerpo,
+            usuarioId
+        ),
+        201
+    );
+}
+
 async function actualizarProducto(req, res) {
     const id = obtenerIdParametro(req, res);
 
@@ -628,6 +655,7 @@ module.exports = {
     // Productos.
     obtenerProductos,
     crearProducto,
+    crearProductoConEntrada,
     actualizarProducto,
     activarProducto,
     desactivarProducto,

@@ -16,6 +16,7 @@
         administrador: [
             ["Ventas", "ventas.html"],
             ["Inventario", "inventario.html"],
+            ["Categorías", "categorias.html"],
             ["Proveedores", "proveedores.html"],
             ["Afluencia", "afluencia.html"],
             ["Satisfacción", "satisfaccion.html"],
@@ -30,6 +31,7 @@
 
         bodega: [
             ["Inventario", "inventario.html"],
+            ["Categorías", "categorias.html"],
             ["Proveedores", "proveedores.html"]
         ],
 

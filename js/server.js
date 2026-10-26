@@ -176,6 +176,35 @@ app.post(
 // ============================================================
 
 const inventoryController = require("./controllers/inventory.controller");
+const ProveedoresController = require("./controllers/proveedores.controller");
+
+// ============================================================
+// PROVEEDORES
+// ============================================================
+
+app.get(
+    "/api/proveedores",
+    inventoryController.requiereGestionInventario,
+    ProveedoresController.listar
+);
+
+app.post(
+    "/api/proveedores",
+    inventoryController.requiereGestionInventario,
+    ProveedoresController.crear
+);
+
+app.put(
+    "/api/proveedores/:id",
+    inventoryController.requiereGestionInventario,
+    ProveedoresController.actualizar
+);
+
+app.delete(
+    "/api/proveedores/:id",
+    inventoryController.requiereGestionInventario,
+    ProveedoresController.eliminar
+);
 
 // ------------------------------------------------------------
 // Consultas generales de inventario
@@ -223,6 +252,12 @@ app.post(
     "/api/inventario/productos",
     inventoryController.requiereGestionInventario,
     inventoryController.crearProducto
+);
+
+app.post(
+    "/api/inventario/productos/con-entrada",
+    inventoryController.requiereGestionInventario,
+    inventoryController.crearProductoConEntrada
 );
 
 app.put(
@@ -279,6 +314,37 @@ app.patch(
     "/api/inventario/recetas/:id/desactivar",
     inventoryController.requiereGestionRecetas,
     inventoryController.desactivarReceta
+);
+
+
+// ============================================================
+// VENTAS BIOX
+// ============================================================
+
+const VentasController = require("./controllers/ventas.controller");
+
+app.get(
+    "/api/ventas/productos",
+    VentasController.requiereVentas,
+    VentasController.listarProductos
+);
+
+app.get(
+    "/api/ventas",
+    VentasController.requiereVentas,
+    VentasController.listar
+);
+
+app.get(
+    "/api/ventas/:id",
+    VentasController.requiereVentas,
+    VentasController.obtener
+);
+
+app.post(
+    "/api/ventas",
+    VentasController.requiereVentas,
+    VentasController.crear
 );
 
 // ============================================================

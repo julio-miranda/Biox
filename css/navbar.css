@@ -1,0 +1,155 @@
+.navbar {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    background: #0f172a;
+    color: #fff;
+    box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+}
+
+.navbar-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    width: min(1500px, 100%);
+    min-height: 68px;
+    margin: auto;
+    padding: 10px 24px;
+}
+
+.navbar-brand {
+    flex-shrink: 0;
+    color: #fff;
+    font-size: 23px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-decoration: none;
+}
+
+.navbar-brand span {
+    color: #60a5fa;
+}
+
+.navbar-menu {
+    display: flex;
+    align-items: center;
+    flex: 1;
+    gap: 5px;
+}
+
+.navbar-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 40px;
+    padding: 10px 12px;
+    border-radius: 7px;
+    color: #cbd5e1;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.navbar-link:hover {
+    background: #1e293b;
+    color: #fff;
+}
+
+.navbar-link.active {
+    background: #1d4ed8;
+    color: #fff;
+}
+
+.navbar-user {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    gap: 12px;
+}
+
+.navbar-user-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    max-width: 180px;
+}
+
+.navbar-user-name {
+    overflow: hidden;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.navbar-user-role {
+    color: #94a3b8;
+    font-size: 11px;
+}
+
+.navbar-toggle {
+    display: none;
+    padding: 8px 11px;
+    border: 1px solid #475569;
+    border-radius: 6px;
+    background: transparent;
+    color: #fff;
+    font-size: 20px;
+}
+
+.btn-logout {
+    padding: 9px 12px;
+    border: 1px solid #475569;
+    border-radius: 7px;
+    background: transparent;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.btn-logout:hover {
+    background: #334155;
+}
+
+@media (max-width: 1100px) {
+    .navbar-container {
+        flex-wrap: wrap;
+    }
+
+    .navbar-toggle {
+        display: block;
+        margin-left: auto;
+    }
+
+    .navbar-menu {
+        display: none;
+        flex-basis: 100%;
+        flex-direction: column;
+        align-items: stretch;
+        order: 3;
+    }
+
+    .navbar-menu.open {
+        display: flex;
+    }
+
+    .navbar-link {
+        width: 100%;
+    }
+
+    .navbar-user {
+        order: 2;
+    }
+}
+
+@media (max-width: 700px) {
+    .navbar-container {
+        padding: 10px 16px;
+    }
+
+    .navbar-user-info {
+        max-width: 125px;
+    }
+}
