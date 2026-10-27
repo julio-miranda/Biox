@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proveedores | BIOX</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/navbar.css">
+
+    <script src="js/session.js" defer></script>
+    <script src="js/controllers/proveedores.client.controller.js" defer></script>
+</head>
+
+<body data-roles="administrador,bodega">
+    <header id="appNavbar"></header>
+
+    <main class="page">
+        <section class="page-header">
+            <div>
+                <h1>Gestión de proveedores</h1>
+                <p>Administra los datos de contacto y fiscales de tus proveedores.</p>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" id="btnRecargarProveedores">
+                    Recargar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnNuevoProveedor">
+                    Añadir proveedor
+                </button>
+            </div>
+        </section>
+
+        <div id="mensajeProveedores" class="message" role="status" aria-live="polite"></div>
+
+        <section class="card">
+            <div class="card-header">
+                <h2>Proveedores</h2>
+                <div class="form-group search-container">
+                    <label for="buscarProveedor">Buscar proveedor</label>
+                    <input
+                        id="buscarProveedor"
+                        class="search-input"
+                        type="search"
+                        placeholder="Nombre, NIT, NRC o contacto..."
+                        autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="filtroEstadoProveedor">Estado</label>
+                    <select id="filtroEstadoProveedor">
+                        <option value="todos">Todos</option>
+                        <option value="activos">Activos</option>
+                        <option value="inactivos">Inactivos</option>
+                    </select>
+                </div>
+                <span class="results-count" id="contadorProveedores">0 proveedores</span>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Proveedor</th>
+                            <th>NIT</th>
+                            <th>NRC</th>
+                            <th>Teléfono</th>
+                            <th>Correo</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="proveedoresTableBody">
+                        <tr><td colspan="7" class="loading-state">Cargando proveedores...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <dialog id="proveedorModal" class="modal-form">
+        <form id="proveedorForm" autocomplete="off">
+            <h2 id="tituloProveedorModal">Añadir proveedor</h2>
+            <input type="hidden" id="proveedorId">
+
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="proveedorNombre">Nombre comercial *</label>
+                    <input id="proveedorNombre" type="text" maxlength="150" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="proveedorRazonSocial">Razón social / denominación</label>
+                    <input id="proveedorRazonSocial" type="text" maxlength="180">
+                </div>
+
+                <div class="form-group">
+                    <label for="proveedorNit">NIT</label>
+                    <input id="proveedorNit" type="text" maxlength="30">
+                </div>
+                <div class="form-group">
+                    <label for="proveedorNrc">NRC</label>
+                    <input id="proveedorNrc" type="text" maxlength="30">
+                </div>
+
+                <div class="form-group">
+                    <label for="proveedorTelefono">Teléfono</label>
+                    <input id="proveedorTelefono" type="tel" maxlength="30" autocomplete="tel">
+                </div>
+                <div class="form-group">
+                    <label for="proveedorEmail">Correo electrónico</label>
+                    <input id="proveedorEmail" type="email" maxlength="254" autocomplete="email">
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="proveedorUbicacion">Ubicación</label>
+                    <input id="proveedorUbicacion" type="text" maxlength="250" autocomplete="street-address">
+                </div>
+
+                <div class="form-group full-width" id="grupoEstadoProveedor" hidden>
+                    <label class="form-check" for="proveedorActivo">
+                        <input id="proveedorActivo" type="checkbox" checked>
+                        Proveedor activo
+                    </label>
+                    <small>Los proveedores inactivos no aparecen al registrar compras de inventario.</small>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="btnCancelarProveedor">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btnGuardarProveedor">Guardar proveedor</button>
+            </div>
+        </form>
+    </dialog>
+</body>
+</html>
