@@ -14,6 +14,7 @@
 
     const MENUS = {
         administrador: [
+            ["Inicio", "dashboard.html"],
             ["Ventas", "ventas.html"],
             ["Inventario", "inventario.html"],
             ["Categorías", "categorias.html"],
@@ -24,18 +25,23 @@
         ],
 
         barra: [
+            ["Inicio", "dashboard.html"],
             ["Ventas", "ventas.html"],
+            ["Inventario", "inventario.html"],
             ["Afluencia", "afluencia.html"],
             ["Satisfacción", "satisfaccion.html"]
         ],
 
         bodega: [
+            ["Inicio", "dashboard.html"],
             ["Inventario", "inventario.html"],
             ["Categorías", "categorias.html"],
             ["Proveedores", "proveedores.html"]
         ],
 
-        pendiente: []
+        pendiente: [
+            ["Inicio", "dashboard.html"]
+        ]
     };
 
     // ============================================================
@@ -307,13 +313,9 @@
     // ============================================================
 
     function obtenerPaginaInicial(rol) {
-        const menu = MENUS[rol];
-
-        if (menu && menu.length > 0) {
-            return menu[0][1];
-        }
-
-        return "index.html";
+        return MENUS[normalizarRol(rol)]
+            ? "dashboard.html"
+            : "index.html";
     }
 
     function mostrarNavbar(usuario) {
@@ -522,6 +524,11 @@
                 return null;
             }
 
+            if (esPaginaLogin()) {
+                redirigir(obtenerPaginaInicial(usuario.role));
+                return usuario;
+            }
+
             const permitidos = document.body.dataset.roles;
 
             if (permitidos) {
@@ -553,6 +560,10 @@
             }
 
             session.usuario = usuario;
+
+            session.obtenerModulos = (rol = usuario.role) =>
+                (MENUS[normalizarRol(rol)] || [])
+                    .map(([nombre, ruta]) => ({ nombre, ruta }));
 
             mostrarNavbar(usuario);
 

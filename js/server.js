@@ -125,6 +125,24 @@ app.post(
 );
 
 // ============================================================
+// AFLUENCIA
+// ============================================================
+
+const AfluenciaController = require("./controllers/afluencia.controller");
+
+app.get(
+    "/api/afluencia",
+    AfluenciaController.requiereAfluencia,
+    AfluenciaController.listar
+);
+
+app.post(
+    "/api/afluencia",
+    AfluenciaController.requiereAfluencia,
+    AfluenciaController.registrar
+);
+
+// ============================================================
 // EMPLEADOS
 // ============================================================
 
@@ -177,6 +195,7 @@ app.post(
 
 const inventoryController = require("./controllers/inventory.controller");
 const ProveedoresController = require("./controllers/proveedores.controller");
+const CategoriasController = require("./controllers/categorias.controller");
 
 // ============================================================
 // PROVEEDORES
@@ -204,6 +223,34 @@ app.delete(
     "/api/proveedores/:id",
     inventoryController.requiereGestionInventario,
     ProveedoresController.eliminar
+);
+
+// ============================================================
+// CATEGORÍAS
+// ============================================================
+
+app.get(
+    "/api/categorias",
+    inventoryController.requiereGestionInventario,
+    CategoriasController.listar
+);
+
+app.post(
+    "/api/categorias",
+    inventoryController.requiereGestionInventario,
+    CategoriasController.crear
+);
+
+app.put(
+    "/api/categorias/:id",
+    inventoryController.requiereGestionInventario,
+    CategoriasController.actualizar
+);
+
+app.delete(
+    "/api/categorias/:id",
+    inventoryController.requiereGestionInventario,
+    CategoriasController.eliminar
 );
 
 // ------------------------------------------------------------

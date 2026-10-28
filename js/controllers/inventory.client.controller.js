@@ -18,6 +18,40 @@
         recetaEditando: null
     };
 
+    function rolActual() {
+        return String(window.BIOXSession?.usuario?.role || "")
+            .trim()
+            .toLowerCase();
+    }
+
+    function puedeGestionarProductos() {
+        return ["administrador", "bodega"].includes(rolActual());
+    }
+
+    function puedeGestionarRecetas() {
+        return rolActual() === "administrador";
+    }
+
+    function aplicarPermisosInterfaz() {
+        $$("[data-inventory-write]").forEach(elemento => {
+            const permiso = elemento.dataset.inventoryWrite;
+            elemento.hidden = permiso === "recetas"
+                ? !puedeGestionarRecetas()
+                : !puedeGestionarProductos();
+        });
+
+        const celdaProductos = $("[data-inventory-products] td[colspan]");
+        const celdaRecetas = $("[data-inventory-recipes] td[colspan]");
+
+        if (celdaProductos) {
+            celdaProductos.colSpan = puedeGestionarProductos() ? 8 : 7;
+        }
+
+        if (celdaRecetas) {
+            celdaRecetas.colSpan = puedeGestionarRecetas() ? 6 : 5;
+        }
+    }
+
     const $ = (selector, root = document) =>
         root.querySelector(selector);
 
@@ -176,7 +210,19 @@
         );
     }
 
+    function stockActualEnUnidades(producto) {
+        if (String(producto?.tipo || "").toLowerCase() === "botella") {
+            return numero(producto?.stock_actual_unidades);
+        }
+
+        return stockActual(producto);
+    }
+
     function stockMinimo(producto) {
+        if (String(producto?.tipo || "").toLowerCase() === "botella") {
+            return numero(producto?.stock_minimo_unidades);
+        }
+
         return numero(producto?.stock_minimo);
     }
 
@@ -202,8 +248,13 @@
 
         if (etiqueta) {
             etiqueta.textContent = tipo === "botella"
-                ? "ml"
+                ? "botellas"
                 : unidad || "unidad";
+        }
+
+        const controlStockMinimo = formulario?.elements.namedItem("stock_minimo");
+        if (controlStockMinimo) {
+            controlStockMinimo.step = tipo === "botella" ? "1" : "any";
         }
     }
 
@@ -369,13 +420,6 @@
                     0
                 );
 
-        const productosBajos = productosActivos.filter(producto =>
-            esProductoInventariable(producto) &&
-            stockActual(producto) <= stockMinimo(producto)
-        );
-
-        const bajo = productosBajos.length;
-
         if ($("#totalProductsCard")) {
             $("#totalProductsCard").textContent =
                 formatoNumero(total);
@@ -386,46 +430,6 @@
                 formatoDinero(valor);
         }
 
-        if ($("#lowStockCard")) {
-            $("#lowStockCard").textContent =
-                formatoNumero(bajo);
-        }
-
-        renderizarStockBajo();
-    }
-
-    function renderizarStockBajo() {
-        const panel = $("#lowStockPanel");
-        const contenido = $("#lowStockContent");
-
-        if (!panel || !contenido) return;
-
-        const bajos = estado.productos.filter(producto =>
-            productoActivo(producto) &&
-            esProductoInventariable(producto) &&
-            stockActual(producto) <= stockMinimo(producto)
-        );
-
-        panel.hidden = bajos.length === 0;
-
-        contenido.innerHTML = bajos.length
-            ? `
-                <ul>
-                    ${bajos.map(producto => `
-                        <li>
-                            <strong>
-                                ${escapar(obtenerNombre(producto))}
-                            </strong>:
-                            ${formatoNumero(stockActual(producto))}
-                            ${escapar(producto.unidad_medida || "")}
-                            (mínimo:
-                            ${formatoNumero(stockMinimo(producto))}
-                            ${escapar(producto.unidad_medida || "")})
-                        </li>
-                    `).join("")}
-                </ul>
-            `
-            : "";
     }
 
     // ============================================================
@@ -457,7 +461,7 @@
         if (!productos.length) {
             mostrarEstadoTabla(
                 cuerpo,
-                8,
+                puedeGestionarProductos() ? 8 : 7,
                 estado.productos.length
                     ? "No hay productos que coincidan con la búsqueda."
                     : "No hay productos registrados."
@@ -471,7 +475,7 @@
             const inventariable = esProductoInventariable(producto);
             const botella = String(producto.tipo || "").toLowerCase() ===
                 "botella";
-            const stock = stockActual(producto);
+            const stock = stockActualEnUnidades(producto);
             const minimo = stockMinimo(producto);
             const bajo = inventariable && stock <= minimo;
             const detalleEnvases = botella
@@ -495,23 +499,8 @@
                     ? "status-low"
                     : "status-normal";
 
-            return `
-                <tr>
-                    <td>${escapar(obtenerNombre(producto))}</td>
-                    <td>${escapar(producto.tipo || "—")}</td>
-                    <td>
-                        ${inventariable
-                            ? `${formatoNumero(stock)}${botella ? " ml" : ""}${detalleEnvases}`
-                            : "—"}
-                    </td>
-                    <td>${escapar(producto.unidad_medida || "—")}</td>
-                    <td>
-                        ${inventariable
-                            ? `${formatoNumero(minimo)}${botella ? " ml" : ""}`
-                            : "—"}
-                    </td>
-                    <td class="${claseStock}">${estadoStock}</td>
-                    <td>${productoActivo(producto) ? "Activo" : "Inactivo"}</td>
+            const acciones = puedeGestionarProductos()
+                ? `
                     <td>
                         <button
                             type="button"
@@ -521,6 +510,23 @@
                             <i class="fa-solid fa-pen"></i>
                         </button>
                     </td>
+                `
+                : "";
+
+            return `
+                <tr>
+                    <td>${escapar(obtenerNombre(producto))}</td>
+                    <td>${escapar(producto.tipo || "—")}</td>
+                    <td>${inventariable
+                        ? `${formatoNumero(stock)}${detalleEnvases}`
+                        : "—"}</td>
+                    <td>${escapar(botella
+                        ? "botellas"
+                        : producto.unidad_medida || "—")}</td>
+                    <td>${inventariable ? formatoNumero(minimo) : "—"}</td>
+                    <td class="${claseStock}">${estadoStock}</td>
+                    <td>${productoActivo(producto) ? "Activo" : "Inactivo"}</td>
+                    ${acciones}
                 </tr>
             `;
         }).join("");
@@ -807,7 +813,11 @@
         const unidad = botella
             ? "ml"
             : (producto.unidad_medida || "unidades");
-        const stock = modo === "nuevo" ? 0 : stockActual(producto);
+        const stock = modo === "nuevo"
+            ? 0
+            : botella
+                ? stockActualEnUnidades(producto)
+                : stockActual(producto);
         const etiquetaStock = modo === "nuevo"
             ? "Existencia inicial"
             : "Stock actual";
@@ -815,7 +825,7 @@
         if (botella) {
             if (!total || !Number.isFinite(contenido) || contenido <= 0) {
                 resumen.textContent = etiquetaStock + ": " +
-                    formatoNumero(stock) + " ml. Completa las cajas, las " +
+                    formatoNumero(stock) + " botellas. Completa las cajas, las " +
                     "unidades por caja y los ml por botella para calcular " +
                     "la compra.";
                 return;
@@ -824,10 +834,11 @@
             const aumentoMl = total * contenido;
 
             resumen.textContent = etiquetaStock + ": " +
-                formatoNumero(stock) + " ml. " + formatoNumero(total) +
-                " botellas × " + formatoNumero(contenido) + " ml = " +
-                formatoNumero(aumentoMl) + " ml. Stock estimado después " +
-                "de guardar: " + formatoNumero(stock + aumentoMl) + " ml.";
+                formatoNumero(stock) + " botellas. Se agregarán " +
+                formatoNumero(total) + " botellas (" +
+                formatoNumero(aumentoMl) + " ml en total). Stock estimado " +
+                "después de guardar: " + formatoNumero(stock + total) +
+                " botellas.";
             return;
         }
 
@@ -1009,7 +1020,8 @@
             unidad_medida: producto.unidad_medida ?? "unidad",
             precio: producto.precio ?? 0,
             costo_promedio: producto.costo_promedio ?? 0,
-            stock_minimo: producto.stock_minimo ?? 0
+            stock_minimo: producto.stock_minimo_unidades ??
+                producto.stock_minimo ?? 0
         };
 
         Object.entries(valores).forEach(([campo, valor]) => {
@@ -1036,6 +1048,29 @@
 
     function datosProducto(formulario) {
         const datos = new FormData(formulario);
+        const tipo = String(datos.get("tipo") || "").trim();
+        const stockMinimoCapturado = Number(datos.get("stock_minimo") || 0);
+        let stockMinimoAlmacenado = stockMinimoCapturado;
+
+        if (tipo === "botella") {
+            if (!Number.isSafeInteger(stockMinimoCapturado) || stockMinimoCapturado < 0) {
+                throw new Error("El stock mínimo de botellas debe ser un número entero.");
+            }
+
+            const productoEditado = estado.productos.find(producto =>
+                obtenerId(producto, "producto") === String(estado.productoEditando)
+            );
+            const contenidoBotella = Number(
+                productoEditado?.contenido_botella_ml ||
+                datos.get("contenido_inicial_ml")
+            );
+
+            if (!Number.isFinite(contenidoBotella) || contenidoBotella <= 0) {
+                throw new Error("No se pudo determinar el contenido de una botella para guardar el stock mínimo.");
+            }
+
+            stockMinimoAlmacenado = stockMinimoCapturado * contenidoBotella;
+        }
 
         return {
             nombre: String(datos.get("nombre") || "").trim(),
@@ -1048,7 +1083,7 @@
             costo_promedio: Number(
                 datos.get("costo_promedio") || 0
             ),
-            stock_minimo: Number(datos.get("stock_minimo") || 0),
+            stock_minimo: stockMinimoAlmacenado,
             activo: datos.has("activo")
         };
     }
@@ -1401,7 +1436,7 @@
         if (!estado.recetas.length) {
             mostrarEstadoTabla(
                 cuerpo,
-                6,
+                puedeGestionarRecetas() ? 6 : 5,
                 "No hay recetas registradas."
             );
 
@@ -1414,6 +1449,28 @@
             const activa = recetaActiva(receta);
             const consumo = estimarConsumoReceta(ingredientes);
             const claseConsumo = consumo.advertencia ? " is-warning" : "";
+            const acciones = puedeGestionarRecetas()
+                ? `
+                    <td>
+                        <button
+                            type="button"
+                            class="action-button action-edit"
+                            data-edit-recipe="${escapar(id)}"
+                            aria-label="Editar receta">
+                            <i class="fa-solid fa-pen"></i>
+                        </button>
+                        ${activa ? `
+                            <button
+                                type="button"
+                                class="action-button action-delete"
+                                data-delete-recipe="${escapar(id)}"
+                                aria-label="Desactivar receta">
+                                <i class="fa-solid fa-ban"></i>
+                            </button>
+                        ` : ""}
+                    </td>
+                `
+                : "";
 
             return `
                 <tr>
@@ -1473,29 +1530,7 @@
                             : ""}
                     </td>
                     <td>${activa ? "Activa" : "Inactiva"}</td>
-                    <td>
-                        <button
-                            type="button"
-                            class="action-button action-edit"
-                            data-edit-recipe="${escapar(id)}"
-                            aria-label="Editar receta">
-                            <i class="fa-solid fa-pen"></i>
-                        </button>
-
-                        ${
-                            activa
-                                ? `
-                                    <button
-                                        type="button"
-                                        class="action-button action-delete"
-                                        data-delete-recipe="${escapar(id)}"
-                                        aria-label="Desactivar receta">
-                                        <i class="fa-solid fa-ban"></i>
-                                    </button>
-                                `
-                                : ""
-                        }
-                    </td>
+                    ${acciones}
                 </tr>
             `;
         }).join("");
@@ -2183,6 +2218,7 @@
             );
         }
 
+        aplicarPermisosInterfaz();
         await cargarDatos();
     }
 

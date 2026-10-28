@@ -114,8 +114,7 @@ const requiereGestionInventario = requiereRoles([
 
 // Gestión de recetas de productos preparados.
 const requiereGestionRecetas = requiereRoles([
-    "administrador",
-    "barra"
+    "administrador"
 ]);
 
 // ============================================================

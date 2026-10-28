@@ -454,6 +454,23 @@ async function obtenerProductos() {
             p.created_at,
             p.updated_at,
             COALESCE(s.stock_actual, 0) AS stock_actual,
+            CASE
+                WHEN p.tipo = 'botella' THEN
+                    COALESCE(s.envases_abiertos, 0) +
+                    COALESCE(s.envases_cerrados, 0)
+                ELSE COALESCE(s.stock_actual, 0)
+            END AS stock_actual_unidades,
+            CASE
+                WHEN p.tipo = 'botella' THEN CEIL(
+                    p.stock_minimo / COALESCE(capacidad.capacidad_ml, 750)
+                )
+                ELSE p.stock_minimo
+            END AS stock_minimo_unidades,
+            CASE
+                WHEN p.tipo = 'botella' THEN
+                    COALESCE(capacidad.capacidad_ml, 750)
+                ELSE NULL
+            END AS contenido_botella_ml,
 
             GREATEST(
                 p.stock_minimo - COALESCE(s.stock_actual, 0), 0
@@ -507,6 +524,14 @@ async function obtenerProductos() {
         FROM catalogo.productos p
         LEFT JOIN inventario.v_stock_actual s
             ON s.productos_id = p.productos_id
+        LEFT JOIN LATERAL (
+            SELECT mode() WITHIN GROUP (
+                ORDER BY e.contenido_inicial_ml
+            ) AS capacidad_ml
+            FROM inventario.envases e
+            WHERE e.producto_id = p.productos_id
+              AND e.contenido_inicial_ml > 0
+        ) AS capacidad ON TRUE
         ORDER BY p.nombre
     `);
 

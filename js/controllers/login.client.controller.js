@@ -51,7 +51,7 @@ loginForm.addEventListener("submit", async (event) => {
         loginMessage.textContent = data.message;
         loginMessage.dataset.type = "success";
 
-        window.location.assign("/empleados.html");
+        window.location.assign("/dashboard.html");
 
     } catch (error) {
         loginMessage.textContent =

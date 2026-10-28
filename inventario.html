@@ -13,7 +13,7 @@
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
 </head>
 
-<body data-page="inventario">
+<body data-page="inventario" data-roles="administrador,bodega,barra">
 
     <header id="appNavbar"></header>
 
@@ -23,7 +23,7 @@
         <section class="page-header">
             <div>
                 <h1>Gestión de inventario</h1>
-                <p>Administra productos, existencias y recetas.</p>
+                <p>Consulta productos, existencias y recetas; las acciones dependen de tu rol.</p>
             </div>
         </section>
 
@@ -48,6 +48,8 @@
             <button
                 id="btnAdd"
                 class="btn btn-primary"
+                data-inventory-write="productos"
+                hidden
                 type="button">
                 <i class="fa-solid fa-plus"></i>
                 Añadir producto
@@ -73,11 +75,6 @@
             <article class="stat-card">
                 <h3>Valor del inventario</h3>
                 <p id="totalValueCard">$0.00</p>
-            </article>
-
-            <article class="stat-card">
-                <h3>Productos con stock bajo</h3>
-                <p id="lowStockCard">0</p>
             </article>
 
         </section>
@@ -110,7 +107,7 @@
                             <th>Stock mínimo</th>
                             <th>Estado del stock</th>
                             <th>Estado</th>
-                            <th>Acciones</th>
+                            <th data-inventory-write="productos" hidden>Acciones</th>
                         </tr>
                     </thead>
 
@@ -137,6 +134,8 @@
                 <button
                     id="btnAddReceta"
                     class="btn btn-primary"
+                    data-inventory-write="recetas"
+                    hidden
                     type="button">
                     <i class="fa-solid fa-plus"></i>
                     Agregar receta
@@ -164,7 +163,7 @@
                             <th>Ingredientes</th>
                             <th>Consumo por unidad vendida</th>
                             <th>Estado</th>
-                            <th>Acciones</th>
+                            <th data-inventory-write="recetas" hidden>Acciones</th>
                         </tr>
                     </thead>
 
@@ -178,12 +177,6 @@
                 </table>
             </div>
 
-        </section>
-
-        <!-- Productos con stock bajo -->
-        <section id="lowStockPanel" class="card" hidden>
-            <h2>Productos con stock bajo</h2>
-            <div id="lowStockContent"></div>
         </section>
 
     </main>
