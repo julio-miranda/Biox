@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Categorías | BIOX</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/navbar.css">
+
+    <script src="js/session.js" defer></script>
+    <script src="js/controllers/categorias.client.controller.js" defer></script>
+</head>
+
+<body data-roles="administrador,bodega">
+    <header id="appNavbar"></header>
+
+    <main class="page">
+        <section class="page-header">
+            <div>
+                <h1>Gestión de categorías</h1>
+                <p>Organiza los productos de inventario y los tragos preparados.</p>
+            </div>
+            <div class="actions">
+                <button type="button" class="btn btn-secondary" id="btnRecargarCategorias">
+                    Recargar
+                </button>
+                <button type="button" class="btn btn-primary" id="btnNuevaCategoria">
+                    Añadir categoría
+                </button>
+            </div>
+        </section>
+
+        <div id="mensajeCategorias" class="message" role="status" aria-live="polite"></div>
+
+        <section class="card">
+            <div class="card-header">
+                <h2>Categorías</h2>
+                <div class="form-group search-container">
+                    <label for="buscarCategoria">Buscar categoría</label>
+                    <input
+                        id="buscarCategoria"
+                        class="search-input"
+                        type="search"
+                        placeholder="Nombre o descripción..."
+                        autocomplete="off">
+                </div>
+                <div class="form-group">
+                    <label for="filtroEstadoCategoria">Estado</label>
+                    <select id="filtroEstadoCategoria">
+                        <option value="todos">Todos</option>
+                        <option value="activas">Activas</option>
+                        <option value="inactivas">Inactivas</option>
+                    </select>
+                </div>
+                <span class="results-count" id="contadorCategorias">0 categorías</span>
+            </div>
+
+            <div class="table-responsive">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="categoriasTableBody">
+                        <tr><td colspan="4" class="loading-state">Cargando categorías...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <dialog id="categoriaModal" class="modal-form">
+        <form id="categoriaForm" autocomplete="off">
+            <h2 id="tituloCategoriaModal">Añadir categoría</h2>
+            <input type="hidden" id="categoriaId">
+
+            <div class="form-grid">
+                <div class="form-group full-width">
+                    <label for="categoriaNombre">Nombre *</label>
+                    <input id="categoriaNombre" type="text" maxlength="100" required>
+                </div>
+
+                <div class="form-group full-width">
+                    <label for="categoriaDescripcion">Descripción</label>
+                    <textarea id="categoriaDescripcion" rows="4" maxlength="5000"></textarea>
+                </div>
+
+                <div class="form-group form-check full-width" id="grupoEstadoCategoria" hidden>
+                    <input id="categoriaActiva" type="checkbox" checked>
+                    <label for="categoriaActiva">Categoría activa</label>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="button" class="btn btn-secondary" id="btnCancelarCategoria">Cancelar</button>
+                <button type="submit" class="btn btn-primary" id="btnGuardarCategoria">Guardar categoría</button>
+            </div>
+        </form>
+    </dialog>
+</body>
+</html>
