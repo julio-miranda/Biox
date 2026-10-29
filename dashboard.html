@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101923">
+    <title>Panel operacional | BIOX</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <script src="js/session.js" defer></script>
+    <script src="js/controllers/dashboard.client.controller.js" defer></script>
+</head>
+<body data-page="operacional" data-roles="administrador,barra,bodega,pendiente">
+
+    <main class="page">
+        <section class="page-header">
+            <div>
+                <h1>Panel operacional</h1>
+                <p>Bienvenido, <strong id="welcomeName">usuario</strong>. Accede a los módulos disponibles para tu rol.</p>
+            </div>
+            <span class="badge badge-role">BIOX · VÉRTIGO</span>
+        </section>
+
+        <section id="modulePanel" class="card" aria-labelledby="modulesTitle">
+            <div class="card-header">
+                <div>
+                    <h2 id="modulesTitle">Tus módulos</h2>
+                </div>
+                <span id="moduleCount" class="results-count"></span>
+            </div>
+
+            <div id="moduleGrid" class="stats-container" aria-live="polite"></div>
+        </section>
+
+        <section id="noModules" class="card" hidden>
+            <h3>Tu cuenta está pendiente de asignación</h3>
+            <p class="section-note">Un administrador debe asignarte un rol para habilitar los módulos operacionales.</p>
+        </section>
+
+    </main>
+</body>
+</html>

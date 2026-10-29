@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#101923">
+    <title>Afluencia | BIOX</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="css/navbar.css">
+    <script src="js/session.js" defer></script>
+    <script src="js/controllers/afluencia.client.controller.js" defer></script>
+</head>
+<body data-page="afluencia" data-roles="administrador,barra">
+    <header id="appNavbar"></header>
+
+    <main class="page">
+        <section class="page-header">
+            <div>
+                <h1>Control de afluencia</h1>
+                <p>Registra los conteos de entradas y salidas de personas.</p>
+            </div>
+            <button type="button" class="btn btn-secondary" id="btnActualizarAfluencia">
+                <span aria-hidden="true">↻</span> Actualizar
+            </button>
+        </section>
+
+        <div id="afluenciaMensaje" class="message" role="status" aria-live="polite"></div>
+
+        <section class="stats-container" aria-label="Resumen de hoy">
+            <article class="stat-card">
+                <h3>Conteo de entradas hoy</h3>
+                <p id="totalEntradas">0</p>
+            </article>
+            <article class="stat-card">
+                <h3>Conteo de salidas hoy</h3>
+                <p id="totalSalidas">0</p>
+            </article>
+            <article class="stat-card">
+                <h3>Movimientos registrados hoy</h3>
+                <p id="totalMovimientos">0</p>
+            </article>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <h2>Registrar movimiento</h2>
+                </div>
+                <span class="badge badge-role">Fecha y hora automáticas</span>
+            </div>
+
+            <form id="afluenciaForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="tipoMovimiento">Movimiento</label>
+                        <select id="tipoMovimiento" name="tipo_movimiento" required>
+                            <option value="entrada">Entrada</option>
+                            <option value="salida">Salida</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="cantidadAfluencia">Cantidad de personas</label>
+                        <input id="cantidadAfluencia" name="cantidad" type="number" min="1" max="10000" step="1" value="1" required>
+                    </div>
+                    <div class="form-group full-width">
+                        <label for="observacionAfluencia">Observación (opcional)</label>
+                        <input id="observacionAfluencia" name="observacion" type="text" maxlength="500" placeholder="Ej. ingreso de grupo, cierre del local...">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="btnRegistrarAfluencia" class="btn btn-primary" type="submit">Registrar movimiento</button>
+                </div>
+            </form>
+            <p class="section-note">La fecha y la hora se asignan automáticamente al guardar. BIOX contabiliza movimientos y no identifica visitantes únicos.</p>
+        </section>
+
+        <section class="card">
+            <div class="card-header">
+                <div>
+                    <h2>Últimos movimientos</h2>
+                </div>
+                <span id="contadorAfluencia" class="results-count">0 registros</span>
+            </div>
+            <div class="table-responsive">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Fecha y hora</th>
+                            <th>Movimiento</th>
+                            <th>Cantidad</th>
+                            <th>Registrado por</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody id="afluenciaTableBody">
+                        <tr><td colspan="5" class="empty-state">Cargando movimientos…</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>
