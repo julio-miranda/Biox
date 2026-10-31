@@ -1,11 +1,10 @@
+// js/controllers/inventory.controller.js
+
 "use strict";
-
 const inventoryModel = require("../models/inventory.model");
-
 // ============================================================
 // CONSTANTES Y VALIDACIONES
 // ============================================================
-
 // Valida la estructura del UUID sin restringir una versión específica.
 const UUID_REGEX =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -16,77 +15,57 @@ function esUuidValido(valor) {
         UUID_REGEX.test(valor.trim())
     );
 }
-
 // ============================================================
 // SESIÓN Y PERMISOS
 // ============================================================
-
 function obtenerUsuarioSesion(req) {
     const sesion = req.session;
-
     if (!sesion || typeof sesion !== "object") {
         return null;
     }
-
     const usuario = sesion.user || sesion.usuario;
-
     if (!usuario || typeof usuario !== "object") {
         return null;
     }
-
     return usuario;
 }
-
 function obtenerIdUsuario(req) {
-    const usuario = obtenerUsuarioSesion(req);
 
+    const usuario = obtenerUsuarioSesion(req);
     if (!usuario) {
         return null;
     }
-
     const id =
         usuario.usuarios_id ||
         usuario.id ||
         usuario.userId;
-
     if (id === undefined || id === null) {
         return null;
     }
-
     const idNormalizado = String(id).trim();
-
     return idNormalizado || null;
 }
-
 function obtenerRol(req) {
     const usuario = obtenerUsuarioSesion(req);
-
     if (!usuario) {
         return "";
     }
-
     const rol = usuario.role || usuario.rol || "";
-
     return String(rol).trim().toLowerCase();
 }
-
 function requiereRoles(rolesPermitidos) {
     const rolesNormalizados = rolesPermitidos.map((rol) =>
         String(rol).trim().toLowerCase()
     );
-
     return function middlewareRoles(req, res, next) {
         const usuario = obtenerUsuarioSesion(req);
-
         if (!usuario) {
             return res.status(401).json({
                 ok: false,
                 mensaje: "Debes iniciar sesión."
             });
         }
-
         const rol = obtenerRol(req);
-
         if (!rol || !rolesNormalizados.includes(rol)) {
             return res.status(403).json({
                 ok: false,
@@ -94,7 +73,6 @@ function requiereRoles(rolesPermitidos) {
                     "No tienes permisos para realizar esta operación."
             });
         }
-
         return next();
     };
 }
@@ -105,28 +83,23 @@ const requiereInventario = requiereRoles([
     "bodega",
     "barra"
 ]);
-
 // Gestión de productos y movimientos de inventario.
 const requiereGestionInventario = requiereRoles([
     "administrador",
     "bodega"
 ]);
-
 // Gestión de recetas de productos preparados.
 const requiereGestionRecetas = requiereRoles([
     "administrador"
 ]);
-
 // ============================================================
 // MANEJO DE ERRORES
 // ============================================================
-
 function responderError(res, error) {
     // Evita intentar enviar otra respuesta si ya se enviaron las cabeceras.
     if (res.headersSent) {
         return;
     }
-
     const errorNormalizado =
         error instanceof Error
             ? error
@@ -135,16 +108,12 @@ function responderError(res, error) {
                     ? "Error desconocido."
                     : String(error)
             );
-
     const codigo = errorNormalizado.code;
-
     // El error original se conserva en el servidor para diagnóstico.
     console.error("Error en inventario:", errorNormalizado);
-
     // --------------------------------------------------------
     // Errores de validación controlados por el modelo.
     // --------------------------------------------------------
-
     if (
         Number.isInteger(errorNormalizado.status) &&
         errorNormalizado.status >= 400 &&
@@ -161,14 +130,12 @@ function responderError(res, error) {
     // --------------------------------------------------------
     // Restricciones de PostgreSQL.
     // --------------------------------------------------------
-
     if (codigo === "23505") {
         return res.status(409).json({
             ok: false,
             mensaje: "Ya existe un registro con esos datos."
         });
     }
-
     if (codigo === "23503") {
         return res.status(400).json({
             ok: false,
@@ -176,7 +143,6 @@ function responderError(res, error) {
                 "El registro hace referencia a un dato inexistente o está relacionado con otros registros."
         });
     }
-
     if (codigo === "23514") {
         return res.status(400).json({
             ok: false,
@@ -184,7 +150,6 @@ function responderError(res, error) {
                 "Uno o más datos incumplen las restricciones permitidas."
         });
     }
-
     if (codigo === "23502") {
         return res.status(400).json({
             ok: false,
@@ -192,7 +157,6 @@ function responderError(res, error) {
                 "Faltan datos obligatorios para completar la operación."
         });
     }
-
     if (
         codigo === "22P02" ||
         codigo === "22003" ||
@@ -208,14 +172,13 @@ function responderError(res, error) {
                 "Los datos enviados tienen un formato o valor no válido."
         });
     }
-
     // --------------------------------------------------------
     // Errores de reglas de negocio de PostgreSQL.
     // P0001 suele corresponder a una excepción personalizada
     // generada por una función o un trigger.
     // --------------------------------------------------------
-
     if (codigo === "P0001") {
+
         return res.status(400).json({
             ok: false,
             mensaje:
@@ -223,11 +186,9 @@ function responderError(res, error) {
                 "La operación no se puede completar por una regla de negocio."
         });
     }
-
     // --------------------------------------------------------
     // Conflictos transitorios de concurrencia.
     // --------------------------------------------------------
-
     if (
         codigo === "40001" ||
         codigo === "40P01"
@@ -238,11 +199,9 @@ function responderError(res, error) {
                 "La operación entró en conflicto con otra transacción. Intenta nuevamente."
         });
     }
-
     // --------------------------------------------------------
     // Problemas de disponibilidad de la base de datos.
     // --------------------------------------------------------
-
     if (
         codigo === "ECONNREFUSED" ||
         codigo === "ETIMEDOUT" ||
@@ -255,19 +214,16 @@ function responderError(res, error) {
                 "El servicio de base de datos no está disponible temporalmente."
         });
     }
-
     // --------------------------------------------------------
     // Errores internos o de configuración del esquema.
     // No se exponen nombres de tablas, columnas ni consultas.
     // --------------------------------------------------------
-
     return res.status(500).json({
         ok: false,
         mensaje:
             "Ocurrió un error interno al procesar el inventario."
     });
 }
-
 // Ejecuta una operación y estandariza las respuestas de la API.
 async function ejecutar(res, callback, status = 200) {
     try {
@@ -281,14 +237,11 @@ async function ejecutar(res, callback, status = 200) {
         return responderError(res, error);
     }
 }
-
 // ============================================================
 // VALIDACIÓN DE CUERPOS DE PETICIÓN
 // ============================================================
-
 function obtenerCuerpo(req, res) {
     const cuerpo = req.body;
-
     if (
         !cuerpo ||
         typeof cuerpo !== "object" ||
@@ -299,92 +252,72 @@ function obtenerCuerpo(req, res) {
             mensaje:
                 "El cuerpo de la solicitud debe contener un objeto JSON válido."
         });
-
         return null;
     }
-
     return cuerpo;
 }
-
 // ============================================================
 // VALIDACIÓN DE IDENTIFICADORES EN PARÁMETROS
 // ============================================================
-
 function obtenerIdParametro(req, res) {
     const valor = req.params?.id;
-
     const id =
         typeof valor === "string"
             ? valor.trim()
             : "";
-
     if (!id) {
         res.status(400).json({
             ok: false,
             mensaje:
                 "El identificador del registro es obligatorio."
         });
-
         return null;
     }
-
     if (!esUuidValido(id)) {
         res.status(400).json({
             ok: false,
             mensaje:
+
                 "El identificador del registro no tiene un formato válido."
         });
-
         return null;
     }
-
     return id;
 }
-
 // ============================================================
 // VALIDACIÓN DE IDENTIFICADORES EN PARÁMETROS DE CONSULTA
 // ============================================================
-
 // Devuelve:
 // - UUID válido si se proporcionó.
 // - null si el parámetro es opcional y está vacío.
 // - undefined si se respondió con un error HTTP.
 function obtenerIdQueryOpcional(req, res, nombre) {
     const valor = req.query?.[nombre];
-
     if (valor === undefined || valor === null) {
         return null;
     }
-
     if (typeof valor !== "string") {
         res.status(400).json({
             ok: false,
             mensaje:
                 `El parámetro "${nombre}" debe contener un único identificador.`
         });
-
         return undefined;
     }
-
     const id = valor.trim();
-
     if (!id) {
         return null;
     }
-
     if (!esUuidValido(id)) {
         res.status(400).json({
             ok: false,
             mensaje:
                 `El parámetro "${nombre}" no contiene un identificador válido.`
         });
-
         return undefined;
     }
-
     return id;
 }
-
 // ============================================================
 // RESUMEN
 // ============================================================
@@ -395,71 +328,58 @@ async function obtenerResumen(req, res) {
         () => inventoryModel.obtenerResumen()
     );
 }
-
 // ============================================================
 // CATEGORÍAS
 // ============================================================
-
 async function obtenerCategorias(req, res) {
     return ejecutar(
         res,
         () => inventoryModel.obtenerCategorias()
     );
 }
-
 // ============================================================
 // PROVEEDORES
 // ============================================================
-
 async function obtenerProveedores(req, res) {
     return ejecutar(
         res,
         () => inventoryModel.obtenerProveedores()
     );
 }
-
 // ============================================================
 // PRODUCTOS
 // ============================================================
-
 async function obtenerProductos(req, res) {
     return ejecutar(
         res,
         () => inventoryModel.obtenerProductos()
     );
 }
-
 async function crearProducto(req, res) {
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.crearProducto(cuerpo),
         201
     );
 }
-
 async function crearProductoConEntrada(req, res) {
     const usuarioId = obtenerIdUsuario(req);
-
     if (!usuarioId || !esUuidValido(usuarioId)) {
         return res.status(401).json({
             ok: false,
+
             mensaje:
                 "No se pudo identificar al usuario de la sesión. Inicia sesión nuevamente."
         });
     }
-
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.crearProductoConEntrada(
@@ -469,42 +389,32 @@ async function crearProductoConEntrada(req, res) {
         201
     );
 }
-
 async function actualizarProducto(req, res) {
     const id = obtenerIdParametro(req, res);
-
     if (!id) {
         return;
     }
-
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.actualizarProducto(id, cuerpo)
     );
 }
-
 async function activarProducto(req, res) {
     const id = obtenerIdParametro(req, res);
-
     if (!id) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.cambiarEstadoProducto(id, true)
     );
 }
-
 async function desactivarProducto(req, res) {
     const id = obtenerIdParametro(req, res);
-
     if (!id) {
         return;
     }
@@ -514,36 +424,29 @@ async function desactivarProducto(req, res) {
         () => inventoryModel.cambiarEstadoProducto(id, false)
     );
 }
-
 // ============================================================
 // ENVASES
 // ============================================================
-
 async function obtenerEnvases(req, res) {
     const productoId = obtenerIdQueryOpcional(
         req,
         res,
         "producto_id"
     );
-
     // undefined indica que el helper ya respondió con un error.
     if (productoId === undefined) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.obtenerEnvases(productoId)
     );
 }
-
 // ============================================================
 // MOVIMIENTOS DE INVENTARIO
 // ============================================================
-
 async function registrarMovimiento(req, res) {
     const usuarioId = obtenerIdUsuario(req);
-
     if (!usuarioId) {
         return res.status(401).json({
             ok: false,
@@ -551,7 +454,6 @@ async function registrarMovimiento(req, res) {
                 "No se pudo identificar al usuario de la sesión. Inicia sesión nuevamente."
         });
     }
-
     // El esquema utiliza identificadores UUID.
     if (!esUuidValido(usuarioId)) {
         return res.status(401).json({
@@ -560,9 +462,7 @@ async function registrarMovimiento(req, res) {
                 "El identificador del usuario de la sesión no es válido. Inicia sesión nuevamente."
         });
     }
-
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
@@ -576,81 +476,64 @@ async function registrarMovimiento(req, res) {
         201
     );
 }
-
 // ============================================================
 // RECETAS
 // ============================================================
-
 async function obtenerRecetas(req, res) {
     return ejecutar(
         res,
         () => inventoryModel.obtenerRecetas()
     );
 }
-
 async function crearReceta(req, res) {
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.crearReceta(cuerpo),
         201
     );
 }
-
 async function actualizarReceta(req, res) {
     const id = obtenerIdParametro(req, res);
-
     if (!id) {
         return;
     }
-
     const cuerpo = obtenerCuerpo(req, res);
-
     if (cuerpo === null) {
         return;
     }
-
     return ejecutar(
         res,
         () => inventoryModel.actualizarReceta(id, cuerpo)
     );
 }
-
 async function desactivarReceta(req, res) {
     const id = obtenerIdParametro(req, res);
-
     if (!id) {
         return;
-    }
 
+    }
     return ejecutar(
         res,
         () => inventoryModel.desactivarReceta(id)
     );
 }
-
 // ============================================================
 // EXPORTACIONES
 // ============================================================
-
 module.exports = {
     // Middleware de autorización.
     requiereInventario,
     requiereGestionInventario,
     requiereGestionRecetas,
-
     // Resumen.
     obtenerResumen,
-
     // Categorías y proveedores.
     obtenerCategorias,
     obtenerProveedores,
-
     // Productos.
     obtenerProductos,
     crearProducto,
@@ -658,13 +541,10 @@ module.exports = {
     actualizarProducto,
     activarProducto,
     desactivarProducto,
-
     // Envases.
     obtenerEnvases,
-
     // Movimientos de inventario.
     registrarMovimiento,
-
     // Recetas.
     obtenerRecetas,
     crearReceta,

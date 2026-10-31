@@ -1,5 +1,3 @@
-// js/controllers/inventory.client.controller.js
-
 (function () {
     "use strict";
 
@@ -14,9 +12,18 @@
         recetas: [],
         cargando: false,
         guardando: false,
-        productoEditando: null,
-        recetaEditando: null
+        productoEditando: null
     };
+
+    const $ = (selector, root = document) =>
+        root.querySelector(selector);
+
+    const $$ = (selector, root = document) =>
+        Array.from(root.querySelectorAll(selector));
+
+    // ============================================================
+    // PERMISOS
+    // ============================================================
 
     function rolActual() {
         return String(window.BIOXSession?.usuario?.role || "")
@@ -35,6 +42,7 @@
     function aplicarPermisosInterfaz() {
         $$("[data-inventory-write]").forEach(elemento => {
             const permiso = elemento.dataset.inventoryWrite;
+
             elemento.hidden = permiso === "recetas"
                 ? !puedeGestionarRecetas()
                 : !puedeGestionarProductos();
@@ -51,12 +59,6 @@
             celdaRecetas.colSpan = puedeGestionarRecetas() ? 6 : 5;
         }
     }
-
-    const $ = (selector, root = document) =>
-        root.querySelector(selector);
-
-    const $$ = (selector, root = document) =>
-        Array.from(root.querySelectorAll(selector));
 
     // ============================================================
     // UTILIDADES
@@ -128,6 +130,8 @@
         return objeto?.nombre ??
             objeto?.producto ??
             objeto?.nombre_producto ??
+            objeto?.razon_social_denominacion ??
+            objeto?.razonSocialDenominacion ??
             objeto?.descripcion ??
             "Sin nombre";
     }
@@ -166,8 +170,13 @@
     }
 
     function normalizarObjeto(respuesta) {
-        if (!respuesta || typeof respuesta !== "object") return {};
-        if (Array.isArray(respuesta)) return {};
+        if (
+            !respuesta ||
+            typeof respuesta !== "object" ||
+            Array.isArray(respuesta)
+        ) {
+            return {};
+        }
 
         for (const clave of ["datos", "data", "resultado"]) {
             const contenido = respuesta[clave];
@@ -241,7 +250,9 @@
         const tipo = String(
             formulario?.elements.namedItem("tipo")?.value || ""
         ).toLowerCase();
+
         const unidad = formulario?.elements.namedItem("unidad_medida")?.value;
+
         const etiqueta = formulario?.querySelector(
             "[data-stock-minimum-unit]"
         );
@@ -252,11 +263,364 @@
                 : unidad || "unidad";
         }
 
-        const controlStockMinimo = formulario?.elements.namedItem("stock_minimo");
-        if (controlStockMinimo) {
-            controlStockMinimo.step = tipo === "botella" ? "1" : "any";
+        const control = formulario?.elements.namedItem("stock_minimo");
+
+        if (control) {
+            control.step = tipo === "botella" ? "1" : "any";
         }
     }
+
+    // ============================================================
+    // COMBOBOX
+    // ============================================================
+
+    const comboboxes = new Map();
+
+    function normalizarTexto(texto) {
+        return String(texto ?? "")
+            .normalize("NFD")
+            .replace(/[\u0300-\u036f]/g, "")
+            .toLocaleLowerCase("es")
+            .trim();
+    }
+
+    function cerrarCombobox(combobox) {
+        if (!combobox) return;
+
+        combobox.lista.hidden = true;
+        combobox.input.setAttribute("aria-expanded", "false");
+        combobox.indiceActivo = -1;
+    }
+
+    function cerrarTodosLosComboboxes(excepto = null) {
+        comboboxes.forEach(combobox => {
+            if (combobox !== excepto) {
+                cerrarCombobox(combobox);
+            }
+        });
+    }
+
+    function seleccionarOpcion(combobox, opcion) {
+        if (!combobox || !opcion) return;
+
+        combobox.hidden.value = opcion.value;
+        combobox.input.value = opcion.label;
+        combobox.seleccionado = opcion.value;
+
+        cerrarCombobox(combobox);
+
+        combobox.input.dispatchEvent(
+            new Event("change", { bubbles: true })
+        );
+    }
+
+    function renderizarOpcionesCombobox(combobox) {
+        const busqueda = normalizarTexto(combobox.input.value);
+
+        const opciones = combobox.opciones.filter(opcion =>
+            normalizarTexto(opcion.label).includes(busqueda)
+        );
+
+        combobox.lista.innerHTML = "";
+
+        if (!opciones.length) {
+            const elemento = document.createElement("li");
+
+            elemento.className = "combobox-empty";
+            elemento.textContent = "No se encontraron resultados.";
+
+            combobox.lista.appendChild(elemento);
+            combobox.indiceActivo = -1;
+            combobox.opcionesFiltradas = [];
+
+            return;
+        }
+
+        opciones.forEach((opcion, indice) => {
+            const elemento = document.createElement("li");
+            const boton = document.createElement("button");
+
+            boton.type = "button";
+            boton.className = "combobox-option";
+            boton.dataset.comboboxOption = "";
+            boton.dataset.comboboxIndex = String(indice);
+            boton.setAttribute("role", "option");
+            boton.textContent = opcion.label;
+
+            boton.setAttribute(
+                "aria-selected",
+                opcion.value === combobox.hidden.value
+                    ? "true"
+                    : "false"
+            );
+
+            elemento.appendChild(boton);
+            combobox.lista.appendChild(elemento);
+        });
+
+        combobox.opcionesFiltradas = opciones;
+    }
+
+    function abrirCombobox(combobox) {
+        if (!combobox || combobox.input.disabled) return;
+
+        cerrarTodosLosComboboxes(combobox);
+
+        renderizarOpcionesCombobox(combobox);
+
+        combobox.lista.hidden = false;
+        combobox.input.setAttribute("aria-expanded", "true");
+    }
+
+    function activarOpcionCombobox(combobox, indice) {
+        const opciones = combobox.opcionesFiltradas || [];
+
+        if (!opciones.length) return;
+
+        const nuevoIndice = Math.max(
+            0,
+            Math.min(indice, opciones.length - 1)
+        );
+
+        combobox.indiceActivo = nuevoIndice;
+
+        const botones = $$(
+            "[data-combobox-option]",
+            combobox.lista
+        );
+
+        botones.forEach((boton, posicion) => {
+            const activo = posicion === nuevoIndice;
+
+            boton.classList.toggle("is-active", activo);
+
+            boton.setAttribute(
+                "aria-selected",
+                activo ? "true" : "false"
+            );
+
+            if (activo) {
+                boton.scrollIntoView({
+                    block: "nearest"
+                });
+            }
+        });
+    }
+
+    function inicializarComboboxes() {
+        $$("[data-combobox]").forEach(raiz => {
+            const clave = raiz.dataset.combobox;
+
+            if (comboboxes.has(clave)) return;
+
+            const input = $("[data-combobox-input]", raiz);
+            const hidden = $("[data-combobox-value]", raiz);
+            const lista = $("[data-combobox-options]", raiz);
+
+            if (!input || !hidden || !lista) {
+                console.warn(
+                    `El combobox "${clave}" no tiene todos los elementos requeridos.`
+                );
+                return;
+            }
+
+            const combobox = {
+                clave,
+                raiz,
+                input,
+                hidden,
+                lista,
+                opciones: [],
+                opcionesFiltradas: [],
+                indiceActivo: -1,
+                seleccionado: hidden.value || ""
+            };
+
+            input.setAttribute("role", "combobox");
+            input.setAttribute("aria-autocomplete", "list");
+            input.setAttribute("aria-expanded", "false");
+
+            lista.setAttribute("role", "listbox");
+            lista.hidden = true;
+
+            if (!input.id) {
+                input.id = `combobox-${clave}`;
+            }
+
+            if (!lista.id) {
+                lista.id = `combobox-list-${clave}`;
+            }
+
+            input.setAttribute("aria-controls", lista.id);
+
+            input.addEventListener("focus", () => {
+                abrirCombobox(combobox);
+            });
+
+            input.addEventListener("click", () => {
+                abrirCombobox(combobox);
+            });
+
+            input.addEventListener("input", () => {
+                const seleccion = combobox.opciones.find(
+                    opcion => opcion.value === hidden.value
+                );
+
+                if (!seleccion || input.value !== seleccion.label) {
+                    hidden.value = "";
+                    combobox.seleccionado = "";
+                }
+
+                abrirCombobox(combobox);
+            });
+
+            input.addEventListener("keydown", event => {
+                const abierto = !lista.hidden;
+                const opciones = combobox.opcionesFiltradas || [];
+
+                if (event.key === "ArrowDown") {
+                    event.preventDefault();
+
+                    if (!abierto) {
+                        abrirCombobox(combobox);
+                        return;
+                    }
+
+                    activarOpcionCombobox(
+                        combobox,
+                        combobox.indiceActivo + 1
+                    );
+                }
+
+                if (event.key === "ArrowUp") {
+                    event.preventDefault();
+
+                    if (!abierto) {
+                        abrirCombobox(combobox);
+                        return;
+                    }
+
+                    activarOpcionCombobox(
+                        combobox,
+                        combobox.indiceActivo < 0
+                            ? opciones.length - 1
+                            : combobox.indiceActivo - 1
+                    );
+                }
+
+                if (event.key === "Enter" && abierto) {
+                    event.preventDefault();
+
+                    const opcion = opciones[combobox.indiceActivo];
+
+                    if (opcion) {
+                        seleccionarOpcion(combobox, opcion);
+                    } else if (opciones.length === 1) {
+                        seleccionarOpcion(combobox, opciones[0]);
+                    }
+                }
+
+                if (event.key === "Escape") {
+                    cerrarCombobox(combobox);
+                }
+            });
+
+            lista.addEventListener("mousedown", event => {
+                event.preventDefault();
+            });
+
+            lista.addEventListener("click", event => {
+                const boton = event.target.closest(
+                    "[data-combobox-option]"
+                );
+
+                if (!boton) return;
+
+                const indice = Number(boton.dataset.comboboxIndex);
+                const opcion = combobox.opcionesFiltradas[indice];
+
+                seleccionarOpcion(combobox, opcion);
+            });
+
+            comboboxes.set(clave, combobox);
+        });
+    }
+
+    function configurarOpcionesCombobox(clave, opciones = []) {
+        const combobox = comboboxes.get(clave);
+
+        if (!combobox) return;
+
+        combobox.opciones = opciones
+            .filter(opcion =>
+                opcion &&
+                opcion.value !== undefined &&
+                opcion.value !== null &&
+                String(opcion.value).trim() !== ""
+            )
+            .map(opcion => ({
+                value: String(opcion.value),
+                label: String(opcion.label ?? "Sin nombre"),
+                data: opcion.data ?? null
+            }));
+
+        const seleccion = combobox.opciones.find(
+            opcion => opcion.value === combobox.hidden.value
+        );
+
+        if (seleccion) {
+            combobox.input.value = seleccion.label;
+            combobox.seleccionado = seleccion.value;
+        } else {
+            combobox.hidden.value = "";
+            combobox.input.value = "";
+            combobox.seleccionado = "";
+        }
+
+        if (!combobox.lista.hidden) {
+            renderizarOpcionesCombobox(combobox);
+        }
+    }
+
+    function limpiarCombobox(clave) {
+        const combobox = comboboxes.get(clave);
+
+        if (!combobox) return;
+
+        combobox.input.value = "";
+        combobox.hidden.value = "";
+        combobox.seleccionado = "";
+
+        cerrarCombobox(combobox);
+    }
+
+    function obtenerValorCombobox(clave) {
+        const combobox = comboboxes.get(clave);
+
+        if (!combobox) return "";
+
+        const valor = combobox.hidden.value;
+
+        const existe = combobox.opciones.some(
+            opcion => opcion.value === valor
+        );
+
+        return existe ? valor : "";
+    }
+
+    document.addEventListener("click", event => {
+        const objetivo = event.target instanceof Element
+            ? event.target
+            : event.target?.parentElement;
+
+        if (!objetivo) return;
+
+        comboboxes.forEach(combobox => {
+            if (!combobox.raiz.contains(objetivo)) {
+                cerrarCombobox(combobox);
+            }
+        });
+    });
 
     // ============================================================
     // PETICIONES HTTP
@@ -398,9 +762,7 @@
 
     function renderizarResumen() {
         const resumen = estado.resumen;
-        const productos = estado.productos;
-
-        const productosActivos = productos.filter(productoActivo);
+        const productosActivos = estado.productos.filter(productoActivo);
 
         const total = resumen.productos_activos ??
             resumen.total_productos ??
@@ -421,15 +783,12 @@
                 );
 
         if ($("#totalProductsCard")) {
-            $("#totalProductsCard").textContent =
-                formatoNumero(total);
+            $("#totalProductsCard").textContent = formatoNumero(total);
         }
 
         if ($("#totalValueCard")) {
-            $("#totalValueCard").textContent =
-                formatoDinero(valor);
+            $("#totalValueCard").textContent = formatoDinero(valor);
         }
-
     }
 
     // ============================================================
@@ -441,19 +800,15 @@
 
         if (!cuerpo) return;
 
-        const busqueda = ($("#salesSearch")?.value || "")
-            .trim()
-            .toLocaleLowerCase("es");
+        const busqueda = normalizarTexto($("#salesSearch")?.value || "");
 
         const productos = estado.productos.filter(producto => {
-            const textoBusqueda = [
+            const textoBusqueda = normalizarTexto([
                 obtenerNombre(producto),
                 producto.tipo,
                 producto.categoria,
                 producto.nombre_categoria
-            ]
-                .join(" ")
-                .toLocaleLowerCase("es");
+            ].join(" "));
 
             return textoBusqueda.includes(busqueda);
         });
@@ -475,9 +830,11 @@
             const inventariable = esProductoInventariable(producto);
             const botella = String(producto.tipo || "").toLowerCase() ===
                 "botella";
+
             const stock = stockActualEnUnidades(producto);
             const minimo = stockMinimo(producto);
             const bajo = inventariable && stock <= minimo;
+
             const detalleEnvases = botella
                 ? `
                     <small class="inventory-stock-detail">
@@ -517,12 +874,16 @@
                 <tr>
                     <td>${escapar(obtenerNombre(producto))}</td>
                     <td>${escapar(producto.tipo || "—")}</td>
-                    <td>${inventariable
-                        ? `${formatoNumero(stock)}${detalleEnvases}`
-                        : "—"}</td>
-                    <td>${escapar(botella
-                        ? "botellas"
-                        : producto.unidad_medida || "—")}</td>
+                    <td>
+                        ${inventariable
+                            ? `${formatoNumero(stock)}${detalleEnvases}`
+                            : "—"}
+                    </td>
+                    <td>
+                        ${escapar(botella
+                            ? "botellas"
+                            : producto.unidad_medida || "—")}
+                    </td>
                     <td>${inventariable ? formatoNumero(minimo) : "—"}</td>
                     <td class="${claseStock}">${estadoStock}</td>
                     <td>${productoActivo(producto) ? "Activo" : "Inactivo"}</td>
@@ -533,7 +894,7 @@
     }
 
     // ============================================================
-    // SELECTORES
+    // SELECTORES Y COMBOBOX
     // ============================================================
 
     function actualizarSelector(selector, elementos, texto, tipo) {
@@ -551,6 +912,7 @@
             if (!id) return;
 
             const opcion = document.createElement("option");
+
             opcion.value = id;
             opcion.textContent = obtenerNombre(elemento);
 
@@ -572,39 +934,36 @@
             categoria.activo !== 0
         );
 
-        $$('[data-inventory-select="categoria"], [data-inventory-select="categoria-receta"]')
-            .forEach(selector => actualizarSelector(
+        $$('[data-inventory-select="categoria"]').forEach(selector => {
+            actualizarSelector(
                 selector,
                 categoriasActivas,
                 "Selecciona una categoría",
                 "categoria"
-            ));
+            );
+        });
 
-        actualizarSelector(
-            $('[data-inventory-select="producto-preparado"]'),
-            estado.productos.filter(producto =>
-                esTragoPreparado(producto) &&
-                productoActivo(producto)
-            ),
-            "Selecciona el producto preparado",
-            "producto"
+        configurarOpcionesCombobox(
+            "producto-existente",
+            estado.productos
+                .filter(producto =>
+                    esProductoInventariable(producto) &&
+                    productoActivo(producto)
+                )
+                .map(producto => ({
+                    value: obtenerId(producto, "producto"),
+                    label: obtenerNombre(producto),
+                    data: producto
+                }))
         );
 
-        actualizarSelector(
-            $('[data-inventory-select="producto-existente"]'),
-            estado.productos.filter(producto =>
-                esProductoInventariable(producto) &&
-                productoActivo(producto)
-            ),
-            "Selecciona un producto existente",
-            "producto"
-        );
-
-        actualizarSelector(
-            $('[data-inventory-select="proveedor-compra"]'),
-            estado.proveedores,
-            "Selecciona el proveedor de esta compra",
-            "proveedor"
+        configurarOpcionesCombobox(
+            "proveedor-compra",
+            estado.proveedores.map(proveedor => ({
+                value: obtenerId(proveedor, "proveedor"),
+                label: obtenerNombre(proveedor),
+                data: proveedor
+            }))
         );
 
         const ingredientes = estado.productos.filter(producto =>
@@ -689,7 +1048,7 @@
     }
 
     // ============================================================
-    // MODALES
+    // MODALES Y FORMULARIOS
     // ============================================================
 
     function abrirDialogo(dialogo) {
@@ -721,42 +1080,20 @@
         if (!contenedor) return;
 
         contenedor.hidden = !visible;
+
         contenedor.querySelectorAll("input, select, textarea")
             .forEach(control => {
                 control.disabled = !visible;
             });
     }
 
-    function actualizarModoProductoReceta() {
-        const formulario = $('[data-inventory-form="receta"]');
-        if (!formulario) return;
-
-        const id = formulario.elements.namedItem("recetas_id");
-        const modo = formulario.elements.namedItem("modo_producto");
-        const selectorProducto = formulario.elements.namedItem("producto_id");
-        const editando = Boolean(id?.value);
-        const creandoProducto = !editando && modo?.value === "nuevo";
-
-        mostrarCampos($("grupoModoProductoReceta"), !editando);
-        mostrarCampos(
-            $("grupoProductoPreparadoExistente"),
-            !creandoProducto
-        );
-
-        $$('[data-receta-producto-nuevo]').forEach(campo =>
-            mostrarCampos(campo, creandoProducto)
-        );
-
-        if (selectorProducto) {
-            selectorProducto.required = !editando && !creandoProducto;
-            selectorProducto.disabled = editando || creandoProducto;
-        }
-    }
+    // ============================================================
+    // COMPRAS
+    // ============================================================
 
     function productoSeleccionadoParaCompra(formulario, modo) {
         if (modo === "existente") {
-            const id =
-                formulario.elements.namedItem("producto_existente_id")?.value;
+            const id = obtenerValorCombobox("producto-existente");
 
             return estado.productos.find(producto =>
                 obtenerId(producto, "producto") === id
@@ -767,7 +1104,13 @@
         const unidad =
             formulario.elements.namedItem("unidad_medida")?.value || "";
 
-        return tipo ? { tipo, unidad_medida: unidad, stock_actual: 0 } : null;
+        return tipo
+            ? {
+                tipo,
+                unidad_medida: unidad,
+                stock_actual: 0
+            }
+            : null;
     }
 
     function actualizarResumenCompra() {
@@ -777,11 +1120,17 @@
 
         const modo =
             formulario.elements.namedItem("modo_producto")?.value || "nuevo";
+
         const producto = productoSeleccionadoParaCompra(formulario, modo);
-        const cajas = Number(formulario.elements.namedItem("cajas")?.value);
+
+        const cajas = Number(
+            formulario.elements.namedItem("cajas")?.value
+        );
+
         const unidadesPorCaja = Number(
             formulario.elements.namedItem("unidades_por_caja")?.value
         );
+
         const total = Number.isSafeInteger(cajas * unidadesPorCaja) &&
             Number.isInteger(cajas) &&
             cajas > 0 &&
@@ -789,10 +1138,13 @@
             unidadesPorCaja > 0
             ? cajas * unidadesPorCaja
             : 0;
+
         const botella = producto?.tipo === "botella";
+
         const contenido = Number(
             formulario.elements.namedItem("contenido_inicial_ml")?.value
         );
+
         const totalControl = $("#productoTotalUnidades");
         const resumen = $("#productoCompraResumen");
 
@@ -807,55 +1159,152 @@
             resumen.textContent = modo === "existente"
                 ? "Selecciona el producto existente para consultar su stock."
                 : "Indica las cajas y unidades por caja para calcular el total.";
+
             return;
         }
 
         const unidad = botella
             ? "ml"
-            : (producto.unidad_medida || "unidades");
+            : producto.unidad_medida || "unidades";
+
         const stock = modo === "nuevo"
             ? 0
             : botella
                 ? stockActualEnUnidades(producto)
                 : stockActual(producto);
+
         const etiquetaStock = modo === "nuevo"
             ? "Existencia inicial"
             : "Stock actual";
 
         if (botella) {
-            if (!total || !Number.isFinite(contenido) || contenido <= 0) {
+            if (
+                !total ||
+                !Number.isFinite(contenido) ||
+                contenido <= 0
+            ) {
                 resumen.textContent = etiquetaStock + ": " +
-                    formatoNumero(stock) + " botellas. Completa las cajas, las " +
-                    "unidades por caja y los ml por botella para calcular " +
-                    "la compra.";
+                    formatoNumero(stock) +
+                    " botellas. Completa las cajas, las unidades por caja " +
+                    "y los ml por botella para calcular la compra.";
+
                 return;
             }
 
             const aumentoMl = total * contenido;
 
             resumen.textContent = etiquetaStock + ": " +
-                formatoNumero(stock) + " botellas. Se agregarán " +
-                formatoNumero(total) + " botellas (" +
-                formatoNumero(aumentoMl) + " ml en total). Stock estimado " +
-                "después de guardar: " + formatoNumero(stock + total) +
+                formatoNumero(stock) +
+                " botellas. Se agregarán " +
+                formatoNumero(total) +
+                " botellas (" +
+                formatoNumero(aumentoMl) +
+                " ml en total). Stock estimado después de guardar: " +
+                formatoNumero(stock + total) +
                 " botellas.";
+
             return;
         }
 
         if (!total) {
             resumen.textContent = etiquetaStock + ": " +
-                formatoNumero(stock) + " " + unidad +
+                formatoNumero(stock) +
+                " " + unidad +
                 ". Completa las cajas y las unidades por caja para calcular " +
                 "la compra.";
+
             return;
         }
 
         resumen.textContent = etiquetaStock + ": " +
-            formatoNumero(stock) + " " + unidad + ". Se agregarán " +
-            formatoNumero(total) + " " + unidad +
+            formatoNumero(stock) +
+            " " + unidad +
+            ". Se agregarán " +
+            formatoNumero(total) +
+            " " + unidad +
             ". Stock estimado después de guardar: " +
-            formatoNumero(stock + total) + " " + unidad + ".";
+            formatoNumero(stock + total) +
+            " " + unidad + ".";
     }
+
+    // ============================================================
+    // AUTOLLENADO DEL PRODUCTO EXISTENTE
+    // ============================================================
+
+    function autollenarProductoExistente(
+        formulario,
+        producto,
+        modoExistente
+    ) {
+        const detalle = $("#productoExistenteDetalle");
+
+        const contenido = formulario.elements.namedItem(
+            "contenido_inicial_ml"
+        );
+
+        if (!modoExistente || !producto) {
+            if (detalle) detalle.hidden = true;
+
+            if (modoExistente && contenido) {
+                contenido.value = "";
+            }
+
+            return;
+        }
+
+        const categoria = estado.categorias.find(item =>
+            obtenerId(item, "categoria") ===
+            String(producto.categoria_id ?? "")
+        );
+
+        const botella = String(producto.tipo || "").toLowerCase() ===
+            "botella";
+
+        const stock = botella
+            ? stockActualEnUnidades(producto)
+            : stockActual(producto);
+
+        const unidadStock = botella
+            ? "botellas"
+            : producto.unidad_medida || "unidades";
+
+        const datos = {
+            nombre: obtenerNombre(producto),
+            categoria:
+                categoria?.nombre ??
+                producto.categoria ??
+                producto.nombre_categoria ??
+                "Sin categoría",
+            tipo: producto.tipo ?? "—",
+            unidad: producto.unidad_medida ?? "—",
+            precio: formatoDinero(producto.precio),
+            stock: `${formatoNumero(stock)} ${unidadStock}`
+        };
+
+        if (detalle) {
+            Object.entries(datos).forEach(([campo, valor]) => {
+                const destino = detalle.querySelector(
+                    `[data-product-info="${campo}"]`
+                );
+
+                if (destino) {
+                    destino.textContent = valor;
+                }
+            });
+
+            detalle.hidden = false;
+        }
+
+        if (contenido) {
+            contenido.value = botella
+                ? String(producto.contenido_botella_ml ?? "")
+                : "";
+        }
+    }
+
+    // ============================================================
+    // ACTUALIZAR FORMULARIO DE PRODUCTO
+    // ============================================================
 
     function actualizarFormularioProducto() {
         const formulario = $('[data-inventory-form="producto"]');
@@ -863,11 +1312,14 @@
         if (!formulario) return;
 
         const editando = Boolean(estado.productoEditando);
+
         const selectorModo =
             formulario.elements.namedItem("modo_producto");
+
         const modo = editando
             ? "editar"
-            : (selectorModo?.value || "nuevo");
+            : selectorModo?.value || "nuevo";
+
         const creando = modo === "nuevo";
         const existente = modo === "existente";
 
@@ -875,18 +1327,24 @@
             $("[data-product-mode-control]"),
             !editando
         );
-        if (selectorModo) selectorModo.disabled = editando;
+
+        if (selectorModo) {
+            selectorModo.disabled = editando;
+        }
 
         $$("[data-product-new-field]").forEach(campo => {
             mostrarCampos(campo, creando || editando);
         });
+
         $$("[data-product-edit-field]").forEach(campo => {
             mostrarCampos(campo, editando);
         });
+
         mostrarCampos(
             $("[data-product-existing-field]"),
             existente && !editando
         );
+
         mostrarCampos(
             $("[data-product-entry]"),
             !editando
@@ -894,18 +1352,23 @@
 
         const selectorExistente =
             formulario.elements.namedItem("producto_existente_id");
+
         if (selectorExistente) {
-            selectorExistente.required = existente && !editando;
+            selectorExistente.required = false;
+        }
+
+        const busquedaProducto = $("#productoExistente");
+
+        if (busquedaProducto) {
+            busquedaProducto.required = existente && !editando;
         }
 
         const tipoControl = formulario.elements.namedItem("tipo");
+
         if (tipoControl) {
             Array.from(tipoControl.options).forEach(opcion => {
-                if (
-                    ["trago_preparado", "servicio"].includes(opcion.value)
-                ) {
-                    opcion.disabled = !editando;
-                }
+                opcion.disabled = !editando &&
+                    !["insumo", "botella"].includes(opcion.value);
             });
 
             if (
@@ -918,7 +1381,10 @@
             if (!editando && tipoControl.value === "botella") {
                 const unidadControl =
                     formulario.elements.namedItem("unidad_medida");
-                if (unidadControl) unidadControl.value = "ml";
+
+                if (unidadControl) {
+                    unidadControl.value = "ml";
+                }
             }
         }
 
@@ -928,18 +1394,27 @@
                 String(estado.productoEditando)
             )
             : productoSeleccionadoParaCompra(formulario, modo);
+
+        autollenarProductoExistente(
+            formulario,
+            producto,
+            existente && !editando
+        );
+
         const botella = producto?.tipo === "botella";
+
         const contenidoCampos = $("#productoContenidoFields");
+
         const contenidoControl =
             formulario.elements.namedItem("contenido_inicial_ml");
-        const entradaVisible = !editando;
 
         if (contenidoCampos) {
-            contenidoCampos.hidden = !entradaVisible || !botella;
+            contenidoCampos.hidden = !(!editando && botella);
         }
+
         if (contenidoControl) {
-            contenidoControl.disabled = !entradaVisible || !botella;
-            contenidoControl.required = entradaVisible && botella;
+            contenidoControl.disabled = editando || !botella;
+            contenidoControl.required = !editando && botella;
         }
 
         if (creando || editando) {
@@ -947,6 +1422,7 @@
         }
 
         const titulo = $("#productoModalTitle");
+
         if (titulo) {
             titulo.textContent = editando
                 ? "Editar producto"
@@ -956,6 +1432,7 @@
         }
 
         const boton = formulario.querySelector('[type="submit"]');
+
         if (boton) {
             boton.textContent = editando
                 ? "Guardar cambios"
@@ -981,20 +1458,26 @@
         formulario.reset();
 
         const id = formulario.elements.namedItem("productos_id");
+
         if (id) id.value = "";
 
         const activo = formulario.elements.namedItem("activo");
-        if (activo) activo.checked = true;
 
-        actualizarUnidadStockMinimo(formulario);
+        if (activo) activo.checked = true;
 
         estado.productoEditando = null;
 
         const modo = formulario.elements.namedItem("modo_producto");
+
         if (modo) modo.value = "nuevo";
 
+        limpiarCombobox("producto-existente");
+        limpiarCombobox("proveedor-compra");
+
+        actualizarUnidadStockMinimo(formulario);
         actualizarSelectores();
         actualizarFormularioProducto();
+
         abrirDialogo($("#productoModal"));
     }
 
@@ -1012,6 +1495,9 @@
 
         formulario.reset();
 
+        limpiarCombobox("producto-existente");
+        limpiarCombobox("proveedor-compra");
+
         const valores = {
             productos_id: obtenerId(producto, "producto"),
             nombre: producto.nombre ?? "",
@@ -1027,7 +1513,9 @@
         Object.entries(valores).forEach(([campo, valor]) => {
             const control = formulario.elements.namedItem(campo);
 
-            if (control) control.value = valor;
+            if (control) {
+                control.value = valor;
+            }
         });
 
         actualizarUnidadStockMinimo(formulario);
@@ -1040,42 +1528,64 @@
 
         estado.productoEditando = String(id);
 
-
         actualizarSelectores();
         actualizarFormularioProducto();
+
         abrirDialogo($("#productoModal"));
     }
 
+    // ============================================================
+    // DATOS Y VALIDACIÓN DE PRODUCTOS
+    // ============================================================
+
     function datosProducto(formulario) {
         const datos = new FormData(formulario);
+
         const tipo = String(datos.get("tipo") || "").trim();
-        const stockMinimoCapturado = Number(datos.get("stock_minimo") || 0);
+
+        const stockMinimoCapturado = Number(
+            datos.get("stock_minimo") || 0
+        );
+
         let stockMinimoAlmacenado = stockMinimoCapturado;
 
         if (tipo === "botella") {
-            if (!Number.isSafeInteger(stockMinimoCapturado) || stockMinimoCapturado < 0) {
-                throw new Error("El stock mínimo de botellas debe ser un número entero.");
+            if (
+                !Number.isSafeInteger(stockMinimoCapturado) ||
+                stockMinimoCapturado < 0
+            ) {
+                throw new Error(
+                    "El stock mínimo de botellas debe ser un número entero."
+                );
             }
 
             const productoEditado = estado.productos.find(producto =>
-                obtenerId(producto, "producto") === String(estado.productoEditando)
+                obtenerId(producto, "producto") ===
+                String(estado.productoEditando)
             );
+
             const contenidoBotella = Number(
                 productoEditado?.contenido_botella_ml ||
                 datos.get("contenido_inicial_ml")
             );
 
-            if (!Number.isFinite(contenidoBotella) || contenidoBotella <= 0) {
-                throw new Error("No se pudo determinar el contenido de una botella para guardar el stock mínimo.");
+            if (
+                !Number.isFinite(contenidoBotella) ||
+                contenidoBotella <= 0
+            ) {
+                throw new Error(
+                    "No se pudo determinar el contenido de una botella para guardar el stock mínimo."
+                );
             }
 
-            stockMinimoAlmacenado = stockMinimoCapturado * contenidoBotella;
+            stockMinimoAlmacenado =
+                stockMinimoCapturado * contenidoBotella;
         }
 
         return {
             nombre: String(datos.get("nombre") || "").trim(),
             categoria_id: datos.get("categoria_id") || null,
-            tipo: String(datos.get("tipo") || "").trim(),
+            tipo,
             unidad_medida: String(
                 datos.get("unidad_medida") || ""
             ).trim(),
@@ -1088,13 +1598,19 @@
         };
     }
 
-    function validarDatosProducto(datos) {
+    function validarDatosProducto(datos, editando = false) {
         if (!datos.nombre) {
             throw new Error("El nombre del producto es obligatorio.");
         }
 
         if (!datos.tipo) {
             throw new Error("Selecciona el tipo de producto.");
+        }
+
+        if (!editando && !["insumo", "botella"].includes(datos.tipo)) {
+            throw new Error(
+                "Solo puedes crear productos de tipo insumo o botella desde este formulario. Los tragos preparados se crean desde la gestión de recetas."
+            );
         }
 
         if (!datos.unidad_medida) {
@@ -1111,11 +1627,11 @@
         }
 
         if (
-            ["trago_preparado", "servicio"].includes(datos.tipo) &&
+            datos.tipo === "trago_preparado" &&
             datos.unidad_medida !== "unidad"
         ) {
             throw new Error(
-                "Los tragos preparados y servicios deben utilizar la unidad unidad."
+                "Los tragos preparados deben utilizar la unidad unidad."
             );
         }
 
@@ -1135,20 +1651,33 @@
         }
     }
 
+    // ============================================================
+    // DATOS DE COMPRA
+    // ============================================================
+
     function datosCompra(formulario, producto) {
         const datos = new FormData(formulario);
-        const proveedorId = String(datos.get("proveedor_id") || "").trim();
+
+        const proveedorId = obtenerValorCombobox("proveedor-compra");
+
         const cajas = Number(datos.get("cajas"));
-        const unidadesPorCaja = Number(datos.get("unidades_por_caja"));
-        const costoPorCaja = Number(datos.get("costo_por_caja"));
+        const unidadesPorCaja = Number(
+            datos.get("unidades_por_caja")
+        );
+
+        const costoPorCaja = Number(
+            datos.get("costo_por_caja")
+        );
 
         if (!proveedorId) {
             throw new Error("Selecciona el proveedor de la compra.");
         }
 
         if (
-            !Number.isInteger(cajas) || cajas < 1 ||
-            !Number.isInteger(unidadesPorCaja) || unidadesPorCaja < 1 ||
+            !Number.isInteger(cajas) ||
+            cajas < 1 ||
+            !Number.isInteger(unidadesPorCaja) ||
+            unidadesPorCaja < 1 ||
             !Number.isSafeInteger(cajas * unidadesPorCaja) ||
             cajas * unidadesPorCaja > 999999999
         ) {
@@ -1170,7 +1699,9 @@
             cajas,
             unidades_por_caja: unidadesPorCaja,
             costo_por_caja: costoPorCaja,
-            observacion: String(datos.get("observacion") || "").trim()
+            observacion: String(
+                datos.get("observacion") || ""
+            ).trim()
         };
 
         if (producto.tipo === "botella") {
@@ -1190,17 +1721,24 @@
         return compra;
     }
 
+    // ============================================================
+    // GUARDAR PRODUCTO
+    // ============================================================
+
     async function guardarProducto(formulario) {
         const id = String(
             formulario.elements.namedItem("productos_id")?.value || ""
         ).trim();
+
         const modo =
             formulario.elements.namedItem("modo_producto")?.value || "nuevo";
+
         let mensaje;
 
         if (id) {
             const datos = datosProducto(formulario);
-            validarDatosProducto(datos);
+
+            validarDatosProducto(datos, true);
 
             const { activo, ...datosProductoAPI } = datos;
 
@@ -1231,11 +1769,8 @@
 
             mensaje = "Producto actualizado.";
         } else if (modo === "existente") {
-            const productoId = String(
-                formulario.elements.namedItem(
-                    "producto_existente_id"
-                )?.value || ""
-            ).trim();
+            const productoId = obtenerValorCombobox("producto-existente");
+
             const producto = estado.productos.find(item =>
                 obtenerId(item, "producto") === productoId
             );
@@ -1262,11 +1797,12 @@
             mensaje = "Compra agregada al producto existente.";
         } else {
             const datos = datosProducto(formulario);
-            validarDatosProducto(datos);
+
+            validarDatosProducto(datos, false);
 
             if (!esProductoInventariable(datos)) {
                 throw new Error(
-                    "Para agregar una compra, el nuevo producto debe ser un insumo o una botella."
+                    "Solo puedes crear insumos o botellas desde este formulario."
                 );
             }
 
@@ -1278,6 +1814,7 @@
                 precio: datos.precio,
                 stock_minimo: datos.stock_minimo
             };
+
             const compra = datosCompra(formulario, datos);
 
             await solicitar("/productos/con-entrada", {
@@ -1292,6 +1829,7 @@
         }
 
         cerrarFormulario(formulario);
+
         await cargarDatos();
         await notificar(mensaje);
     }
@@ -1306,11 +1844,7 @@
             receta?.receta_detalle ??
             [];
 
-        if (Array.isArray(ingredientes)) {
-            return ingredientes;
-        }
-
-        return [];
+        return Array.isArray(ingredientes) ? ingredientes : [];
     }
 
     function productoDeReceta(receta) {
@@ -1342,9 +1876,11 @@
                 ingrediente.productos_id ??
                 ""
             );
+
             const producto = estado.productos.find(item =>
                 obtenerId(item, "producto") === ingredienteId
             );
+
             const cantidad = Number(ingrediente.cantidad);
 
             if (!Number.isFinite(cantidad) || cantidad <= 0) {
@@ -1359,6 +1895,7 @@
                     )
                     .map(envase => Number(envase.contenido_inicial_ml))
                 : [];
+
             const envaseMinimo = tamanosEnvase.length
                 ? Math.min(...tamanosEnvase)
                 : null;
@@ -1396,15 +1933,22 @@
 
         if (!formulario || !preview) return;
 
-        const ingredientes = $$("[data-ingredient-row]", formulario).map(fila => ({
+        const ingredientes = $$(
+            "[data-ingredient-row]",
+            formulario
+        ).map(fila => ({
             insumo_id: fila.querySelector(".ingredient-product")?.value,
             cantidad: fila.querySelector(".ingredient-quantity")?.value
         }));
 
-        if (!ingredientes.some(item => item.insumo_id && item.cantidad)) {
+        if (!ingredientes.some(item =>
+            item.insumo_id && item.cantidad
+        )) {
             preview.classList.remove("is-warning");
+
             preview.textContent =
                 "Completa la receta para ver el consumo por unidad vendida.";
+
             return;
         }
 
@@ -1413,6 +1957,7 @@
         if (!estimado.lineas.length) {
             preview.classList.remove("is-warning");
             preview.textContent = "Ingresa cantidades válidas.";
+
             return;
         }
 
@@ -1422,11 +1967,23 @@
             linea.unidad
         );
 
-        preview.classList.toggle("is-warning", estimado.advertencia);
+        preview.classList.toggle(
+            "is-warning",
+            estimado.advertencia
+        );
+
         preview.textContent =
-            "Por cada unidad vendida: " + cantidades.join("; ") + "." +
-            (estimado.advertencia ? " " + estimado.mensaje : "");
+            "Por cada unidad vendida: " +
+            cantidades.join("; ") +
+            "." +
+            (estimado.advertencia
+                ? " " + estimado.mensaje
+                : "");
     }
+
+    // ============================================================
+    // RENDERIZAR RECETAS
+    // ============================================================
 
     function renderizarRecetas() {
         const cuerpo = $("[data-inventory-recipes]");
@@ -1447,8 +2004,13 @@
             const id = obtenerId(receta, "receta");
             const ingredientes = ingredientesDe(receta);
             const activa = recetaActiva(receta);
+
             const consumo = estimarConsumoReceta(ingredientes);
-            const claseConsumo = consumo.advertencia ? " is-warning" : "";
+
+            const claseConsumo = consumo.advertencia
+                ? " is-warning"
+                : "";
+
             const acciones = puedeGestionarRecetas()
                 ? `
                     <td>
@@ -1459,6 +2021,7 @@
                             aria-label="Editar receta">
                             <i class="fa-solid fa-pen"></i>
                         </button>
+
                         ${activa ? `
                             <button
                                 type="button"
@@ -1476,6 +2039,7 @@
                 <tr>
                     <td>${escapar(productoDeReceta(receta))}</td>
                     <td>${escapar(receta.descripcion || "—")}</td>
+
                     <td>
                         ${
                             ingredientes.length
@@ -1483,6 +2047,7 @@
                                     const ingredienteId = String(
                                         ingrediente.insumo_id ??
                                         ingrediente.producto_id ??
+                                        ingrediente.productos_id ??
                                         ""
                                     );
 
@@ -1517,18 +2082,27 @@
                                 : "Sin detalle de ingredientes"
                         }
                     </td>
+
                     <td class="recipe-consumption${claseConsumo}">
-                        ${consumo.lineas.length
-                            ? consumo.lineas.map(linea =>
-                                escapar(linea.nombre) + ": " +
-                                formatoNumero(linea.consumo) + " " +
-                                escapar(linea.unidad)
-                            ).join("<br>")
-                            : "Sin consumo calculable"}
-                        ${consumo.advertencia
-                            ? "<small>" + escapar(consumo.mensaje) + "</small>"
-                            : ""}
+                        ${
+                            consumo.lineas.length
+                                ? consumo.lineas.map(linea =>
+                                    escapar(linea.nombre) + ": " +
+                                    formatoNumero(linea.consumo) + " " +
+                                    escapar(linea.unidad)
+                                ).join("<br>")
+                                : "Sin consumo calculable"
+                        }
+
+                        ${
+                            consumo.advertencia
+                                ? "<small>" +
+                                    escapar(consumo.mensaje) +
+                                    "</small>"
+                                : ""
+                        }
                     </td>
+
                     <td>${activa ? "Activa" : "Inactiva"}</td>
                     ${acciones}
                 </tr>
@@ -1537,7 +2111,7 @@
     }
 
     // ============================================================
-    // RECETAS: INGREDIENTES DEL FORMULARIO
+    // INGREDIENTES DEL FORMULARIO
     // ============================================================
 
     function crearFilaIngrediente(datos = {}) {
@@ -1553,6 +2127,7 @@
         fila.innerHTML = `
             <div class="form-group">
                 <label>Ingrediente</label>
+
                 <select class="ingredient-product" required>
                     <option value="">Selecciona un ingrediente</option>
                 </select>
@@ -1560,6 +2135,7 @@
 
             <div class="form-group">
                 <label>Cantidad</label>
+
                 <input
                     class="ingredient-quantity"
                     type="number"
@@ -1664,7 +2240,7 @@
     }
 
     // ============================================================
-    // CREAR Y EDITAR RECETAS
+    // CREAR RECETA
     // ============================================================
 
     function nuevaReceta() {
@@ -1675,6 +2251,7 @@
         formulario.reset();
 
         const id = formulario.elements.namedItem("recetas_id");
+
         if (id) id.value = "";
 
         const activa = formulario.elements.namedItem("activa");
@@ -1690,34 +2267,26 @@
             contenedor.innerHTML = "";
         }
 
-        const selectorProducto = formulario.elements.namedItem("producto_id");
-
-        if (selectorProducto) {
-            selectorProducto.disabled = false;
-        }
-
-        const modoProducto = formulario.elements.namedItem("modo_producto");
-        if (modoProducto) {
-            modoProducto.value = "nuevo";
-        }
-
-        estado.recetaEditando = null;
-
         if ($("#recetaModalTitle")) {
-            $("#recetaModalTitle").textContent = "Agregar receta";
+            $("#recetaModalTitle").textContent =
+                "Crear trago preparado";
         }
 
         const boton = formulario.querySelector('[type="submit"]');
 
         if (boton) {
-            boton.textContent = "Guardar receta";
+            boton.textContent = "Crear trago y guardar receta";
         }
 
         actualizarSelectores();
-        actualizarModoProductoReceta();
         crearFilaIngrediente();
+
         abrirDialogo($("#recetaModal"));
     }
+
+    // ============================================================
+    // EDITAR RECETA
+    // ============================================================
 
     async function editarReceta(id) {
         let receta = estado.recetas.find(item =>
@@ -1739,7 +2308,11 @@
                     )
                 );
 
-                receta = { ...receta, ...detalle };
+                receta = {
+                    ...receta,
+                    ...detalle
+                };
+
                 ingredientes = ingredientesDe(receta);
             } catch (error) {
                 mostrarMensaje(
@@ -1757,14 +2330,8 @@
 
         formulario.reset();
 
-        const modoProducto = formulario.elements.namedItem("modo_producto");
-        if (modoProducto) {
-            modoProducto.value = "existente";
-        }
-
         const valores = {
             recetas_id: obtenerId(receta, "receta"),
-            producto_id: receta.producto_id ?? receta.productos_id ?? "",
             descripcion: receta.descripcion ?? ""
         };
 
@@ -1783,22 +2350,11 @@
             activa.disabled = true;
         }
 
-        const selectorProducto =
-            formulario.elements.namedItem("producto_id");
-
-        // La receta permite modificar descripción e ingredientes, pero
-        // no reasignar el producto preparado.
-        if (selectorProducto) {
-            selectorProducto.disabled = true;
-        }
-
         const contenedor = $("[data-inventory-ingredients]");
 
         if (contenedor) {
             contenedor.innerHTML = "";
         }
-
-        estado.recetaEditando = String(id);
 
         if ($("#recetaModalTitle")) {
             $("#recetaModalTitle").textContent = "Editar receta";
@@ -1811,7 +2367,6 @@
         }
 
         actualizarSelectores();
-        actualizarModoProductoReceta();
 
         if (ingredientes.length) {
             ingredientes.forEach(ingrediente =>
@@ -1824,55 +2379,82 @@
         abrirDialogo($("#recetaModal"));
     }
 
+    // ============================================================
+    // GUARDAR RECETA
+    // ============================================================
+
     async function guardarReceta(formulario) {
         const id = String(
             formulario.elements.namedItem("recetas_id")?.value || ""
         ).trim();
 
         const f = new FormData(formulario);
-        const modoProducto = id
-            ? "existente"
-            : String(f.get("modo_producto") || "existente");
-        const creandoProducto = !id && modoProducto === "nuevo";
-
-        // Al editar, el selector de producto está deshabilitado y no
-        // aparece en FormData. Se conserva el producto de la receta.
-        const recetaExistente = id
-            ? estado.recetas.find(item =>
-                obtenerId(item, "receta") === id
-            )
-            : null;
-
-        const producto_id = creandoProducto
-            ? ""
-            : id
-                ? String(
-                recetaExistente?.producto_id ??
-                recetaExistente?.productos_id ??
-                ""
-                ).trim()
-                : String(f.get("producto_id") || "").trim();
 
         const descripcion = String(
             f.get("descripcion") || ""
         ).trim();
 
-        if (!creandoProducto && !producto_id) {
-            throw new Error("Selecciona el producto preparado.");
-        }
+        let producto_id = "";
 
-        let productoNuevo = null;
+        if (id) {
+            const recetaExistente = estado.recetas.find(item =>
+                obtenerId(item, "receta") === id
+            );
 
-        if (creandoProducto) {
+            producto_id = String(
+                recetaExistente?.producto_id ??
+                recetaExistente?.productos_id ??
+                ""
+            ).trim();
+
+            if (!producto_id) {
+                const detalle = normalizarObjeto(
+                    await solicitar(
+                        `/recetas/${encodeURIComponent(id)}`
+                    )
+                );
+
+                producto_id = String(
+                    detalle.producto_id ??
+                    detalle.productos_id ??
+                    ""
+                ).trim();
+            }
+
+            if (!producto_id) {
+                throw new Error(
+                    "No se pudo identificar el trago preparado asociado a esta receta."
+                );
+            }
+
+            const producto = estado.productos.find(item =>
+                obtenerId(item, "producto") === producto_id
+            );
+
+            if (!producto || !esTragoPreparado(producto)) {
+                throw new Error(
+                    "La receta no está asociada a un trago preparado válido."
+                );
+            }
+
+            if (!productoActivo(producto)) {
+                throw new Error(
+                    "No se puede guardar una receta para un trago preparado inactivo."
+                );
+            }
+        } else {
             const nombre = String(
                 f.get("producto_nuevo_nombre") || ""
             ).trim();
+
             const categoriaId = String(
                 f.get("producto_nuevo_categoria_id") || ""
             ).trim();
+
             const precioValor = String(
                 f.get("producto_nuevo_precio") ?? ""
             ).trim();
+
             const precio = Number(precioValor);
 
             if (!nombre || nombre.length > 150) {
@@ -1884,6 +2466,7 @@
             const categoria = estado.categorias.find(item =>
                 obtenerId(item, "categoria") === categoriaId
             );
+
             if (
                 !categoria ||
                 categoria.activo === false ||
@@ -1892,42 +2475,36 @@
                 throw new Error("Selecciona una categoría activa.");
             }
 
-            if (!precioValor || !Number.isFinite(precio) || precio < 0) {
+            if (
+                !precioValor ||
+                !Number.isFinite(precio) ||
+                precio < 0
+            ) {
                 throw new Error("Ingresa un precio de venta válido.");
-            }
-
-            productoNuevo = {
-                nombre,
-                categoria_id: categoriaId,
-                precio
-            };
-        } else {
-            const producto = estado.productos.find(item =>
-                obtenerId(item, "producto") === producto_id
-            );
-
-            if (!producto || !esTragoPreparado(producto)) {
-                throw new Error(
-                    "La receta debe asociarse a un producto preparado."
-                );
-            }
-
-            if (!productoActivo(producto)) {
-                throw new Error(
-                    "No se puede guardar una receta para un producto inactivo."
-                );
             }
         }
 
+        const ingredientes = recopilarIngredientes();
+
         const payload = {
             descripcion,
-            ingredientes: recopilarIngredientes()
+            ingredientes
         };
 
-        if (productoNuevo) {
-            payload.producto_nuevo = productoNuevo;
-        } else {
+        if (id) {
             payload.producto_id = producto_id;
+        } else {
+            payload.producto_nuevo = {
+                nombre: String(
+                    f.get("producto_nuevo_nombre")
+                ).trim(),
+                categoria_id: String(
+                    f.get("producto_nuevo_categoria_id")
+                ).trim(),
+                precio: Number(
+                    f.get("producto_nuevo_precio")
+                )
+            };
         }
 
         await solicitar(
@@ -1945,9 +2522,15 @@
         await cargarDatos();
 
         await notificar(
-            id ? "Receta actualizada." : "Receta creada."
+            id
+                ? "Receta actualizada."
+                : "Trago preparado y receta creados correctamente."
         );
     }
+
+    // ============================================================
+    // DESACTIVAR RECETA
+    // ============================================================
 
     async function eliminarReceta(id) {
         const receta = estado.recetas.find(item =>
@@ -1974,7 +2557,9 @@
                 `/recetas/${encodeURIComponent(id)}/estado`,
                 {
                     method: "PATCH",
-                    body: { activa: false }
+                    body: {
+                        activa: false
+                    }
                 }
             );
 
@@ -1989,7 +2574,7 @@
     }
 
     // ============================================================
-    // FORMULARIOS
+    // GUARDAR FORMULARIOS
     // ============================================================
 
     async function guardarFormulario(formulario) {
@@ -1998,7 +2583,6 @@
         estado.guardando = true;
 
         const boton = formulario.querySelector('[type="submit"]');
-
         const textoOriginal = boton?.textContent || "";
 
         if (boton) {
@@ -2026,6 +2610,7 @@
 
             if (boton) {
                 boton.disabled = false;
+
                 boton.textContent = textoOriginal ||
                     (
                         formulario.dataset.inventoryForm === "receta"
@@ -2041,19 +2626,38 @@
     // ============================================================
 
     function registrarEventos() {
+        inicializarComboboxes();
+
         $("#btnRecargar")?.addEventListener("click", cargarDatos);
         $("#btnAdd")?.addEventListener("click", nuevaProducto);
         $("#btnAddReceta")?.addEventListener("click", nuevaReceta);
 
-        $("#recetaModoProducto")?.addEventListener(
-            "change",
-            actualizarModoProductoReceta
-        );
+        $("#modoProducto")?.addEventListener("change", () => {
+            const modo = $("#modoProducto")?.value;
 
-        $("#modoProducto")?.addEventListener(
-            "change",
-            actualizarFormularioProducto
-        );
+            if (modo === "nuevo") {
+                limpiarCombobox("producto-existente");
+
+                const formulario = $('[data-inventory-form="producto"]');
+
+                const contenido = formulario?.elements.namedItem(
+                    "contenido_inicial_ml"
+                );
+
+                if (contenido) {
+                    contenido.value = "";
+                }
+
+                const detalle = $("#productoExistenteDetalle");
+
+                if (detalle) {
+                    detalle.hidden = true;
+                }
+            }
+
+            actualizarFormularioProducto();
+        });
+
         $("#productoExistente")?.addEventListener(
             "change",
             actualizarFormularioProducto
@@ -2077,6 +2681,7 @@
         );
 
         const formularioReceta = $('[data-inventory-form="receta"]');
+
         ["input", "change"].forEach(tipoEvento => {
             formularioReceta?.addEventListener(
                 tipoEvento,
@@ -2167,6 +2772,7 @@
                 quitarBtn
                     .closest("[data-ingredient-row]")
                     ?.remove();
+
                 actualizarPreviewConsumoReceta();
             }
         });
@@ -2219,11 +2825,12 @@
         }
 
         aplicarPermisosInterfaz();
+
         await cargarDatos();
     }
 
     // ============================================================
-    // API PÚBLICA DEL CONTROLADOR
+    // API PÚBLICA
     // ============================================================
 
     window.InventoryClient = {
