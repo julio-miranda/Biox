@@ -7,7 +7,8 @@ WHERE NOT EXISTS (
 \gexec
 
 \connect biox_dw
-
+\encoding UTF8
+SET client_encoding = 'UTF8';
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS dw;

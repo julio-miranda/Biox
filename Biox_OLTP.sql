@@ -1,5 +1,12 @@
-CREATE DATABASE Biox_OLTP;
+CREATE DATABASE biox_oltp
+    WITH
+    ENCODING = 'UTF8'
+    TEMPLATE = template0;
+
 \connect biox_oltp
+
+\encoding UTF8
+SET client_encoding = 'UTF8';
 
 BEGIN;
 

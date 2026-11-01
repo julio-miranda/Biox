@@ -1,4 +1,8 @@
+
+\encoding UTF8
 \connect biox_oltp
+
+SET client_encoding = 'UTF8';
 
 BEGIN;
 
