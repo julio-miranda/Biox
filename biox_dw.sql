@@ -659,17 +659,55 @@ SELECT
     dp.producto_sk,
     dp.nombre AS producto,
     f.tipo_movimiento,
+    CASE
+        WHEN f.tipo_movimiento IN ('entrada', 'ajuste_entrada', 'devolucion')
+            THEN 'Entrada'
+        WHEN f.tipo_movimiento IN ('salida', 'ajuste_salida', 'consumo_receta')
+            THEN 'Salida'
+        ELSE 'No clasificado'
+    END AS clasificacion_movimiento,
     f.unidad_medida,
+    COUNT(*) AS total_movimientos,
     SUM(f.cantidad_movimiento) AS cantidad_movida,
-    SUM(f.cantidad_firmada) AS cantidad_neta
+    SUM(
+        CASE
+            WHEN f.tipo_movimiento IN ('entrada', 'ajuste_entrada', 'devolucion')
+                THEN f.cantidad_movimiento
+            ELSE 0
+        END
+    ) AS cantidad_entrada,
+    SUM(
+        CASE
+            WHEN f.tipo_movimiento IN ('salida', 'ajuste_salida', 'consumo_receta')
+                THEN f.cantidad_movimiento
+            ELSE 0
+        END
+    ) AS cantidad_salida,
+    SUM(
+        CASE
+            WHEN f.tipo_movimiento IN ('entrada', 'ajuste_entrada', 'devolucion')
+                THEN f.cantidad_movimiento
+            WHEN f.tipo_movimiento IN ('salida', 'ajuste_salida', 'consumo_receta')
+                THEN -f.cantidad_movimiento
+            ELSE 0
+        END
+    ) AS cantidad_neta,
+    SUM(f.cantidad_firmada) AS cantidad_neta_etl
 FROM dw.fact_inventario f
-JOIN dw.dim_fecha df ON df.fecha_sk = f.fecha_sk
-JOIN dw.dim_producto dp ON dp.producto_sk = f.producto_sk
-JOIN dw.dim_categoria dc ON dc.categoria_sk = f.categoria_sk
+JOIN dw.dim_fecha df
+    ON df.fecha_sk = f.fecha_sk
+JOIN dw.dim_producto dp
+    ON dp.producto_sk = f.producto_sk
+JOIN dw.dim_categoria dc
+    ON dc.categoria_sk = f.categoria_sk
 GROUP BY
-    df.fecha, dc.categoria_sk, dc.nombre,
-    dp.producto_sk, dp.nombre,
-    f.tipo_movimiento, f.unidad_medida;
+    df.fecha,
+    dc.categoria_sk,
+    dc.nombre,
+    dp.producto_sk,
+    dp.nombre,
+    f.tipo_movimiento,
+    f.unidad_medida;
 
 CREATE OR REPLACE VIEW dw.vw_afluencia_horaria AS
 SELECT
