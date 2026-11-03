@@ -9,6 +9,7 @@ WHERE NOT EXISTS (
 \connect biox_dw
 \encoding UTF8
 SET client_encoding = 'UTF8';
+
 BEGIN;
 
 CREATE SCHEMA IF NOT EXISTS dw;
@@ -16,7 +17,7 @@ CREATE SCHEMA IF NOT EXISTS stg;
 CREATE SCHEMA IF NOT EXISTS meta;
 
 -- ============================================================
--- TABLAS DE STAGING
+-- TABLAS DE EXTRACCIÓN Y TRANSFORMACIÓN
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS stg.categorias (
@@ -70,7 +71,7 @@ CREATE TABLE IF NOT EXISTS stg.venta_detalle (
     producto_uuid uuid NOT NULL,
     cantidad numeric(12,3) NOT NULL,
     precio_unitario numeric(12,2) NOT NULL,
-    costo_unitario numeric(12,2) NOT NULL,
+    costo_unitario numeric(12,4) NOT NULL,
     total_linea numeric(12,2) NOT NULL,
     created_at timestamptz NOT NULL
 );
@@ -964,5 +965,80 @@ SELECT
         ELSE 'critico'
     END AS estado_semaforo
 FROM porcentajes;
+
+-- ============================================================
+-- EXISTENCIAS DE LA ÚLTIMA EJECUCIÓN ETL EXITOSA
+-- ============================================================
+
+CREATE OR REPLACE VIEW dw.vw_existencias_actuales AS
+WITH ultima_ejecucion AS (
+    SELECT run_uuid
+    FROM dw.etl_runs
+    WHERE estado = 'success'
+    ORDER BY finished_at DESC, started_at DESC
+    LIMIT 1
+)
+SELECT
+    fe.producto_uuid,
+    fe.categoria_uuid,
+    df.fecha,
+    dp.producto_sk,
+    dp.nombre AS producto,
+    dp.tipo AS tipo_producto,
+    dc.nombre AS categoria,
+    fe.stock_actual,
+    fe.stock_minimo,
+    fe.bajo_minimo,
+    fe.unidad_medida,
+    fe.capturado_en,
+    fe.run_uuid
+FROM dw.fact_existencias fe
+JOIN ultima_ejecucion ue
+    ON ue.run_uuid = fe.run_uuid
+JOIN dw.dim_fecha df
+    ON df.fecha_sk = fe.fecha_sk
+JOIN dw.dim_producto dp
+    ON dp.producto_sk = fe.producto_sk
+LEFT JOIN dw.dim_categoria dc
+    ON dc.categoria_uuid = fe.categoria_uuid
+   AND dc.es_actual;
+
+-- ============================================================
+-- ESTADO DE LA ÚLTIMA EJECUCIÓN ETL
+-- ============================================================
+
+CREATE OR REPLACE VIEW dw.vw_ultima_ejecucion_etl AS
+SELECT
+    run_uuid,
+    started_at,
+    finished_at,
+    estado,
+    filas_extraidas,
+    filas_validadas,
+    error,
+    CASE
+        WHEN estado = 'success' THEN 'Completado'
+        WHEN estado = 'running' THEN 'En ejecución'
+        WHEN estado = 'failed' THEN 'Fallido'
+        ELSE 'Desconocido'
+    END AS estado_descripcion,
+    CASE
+        WHEN finished_at IS NOT NULL
+            THEN finished_at - started_at
+        ELSE now() - started_at
+    END AS duracion
+FROM dw.etl_runs
+ORDER BY started_at DESC
+LIMIT 1;
+
+-- ============================================================
+-- ÍNDICES PARA CONSULTAS DEL DASHBOARD
+-- ============================================================
+
+CREATE INDEX IF NOT EXISTS ix_etl_runs_estado_fecha
+    ON dw.etl_runs (estado, finished_at DESC);
+
+CREATE INDEX IF NOT EXISTS ix_fact_existencias_run_producto
+    ON dw.fact_existencias (run_uuid, producto_uuid);
 
 COMMIT;
