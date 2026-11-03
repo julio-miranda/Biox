@@ -13,7 +13,7 @@ psql -U postgres -f biox_dw.sql
 El script crea `biox_dw` si todavía no existe. Si ya existe, vuelve a conectarse y aplica los objetos `CREATE ... IF NOT EXISTS` y las vistas.
 La carga de instantáneas utiliza `MERGE` y requiere PostgreSQL 15 o superior.
 
-## Instalar ELT y dashboard
+## Instalar ETL y dashboard
 
 ```powershell
 python --version  # Python 3.10 o superior
@@ -21,7 +21,7 @@ python -m pip install -r requirements_dw.txt
 python etl_biox_dw_gui.py
 ```
 
-La ventana tiene dos botones: **Probar conexiones** y **Ejecutar carga ELT**. También puedes abrir `Abrir_ELT_BIOX.bat` con doble clic. La carga requiere que `biox_dw.sql` se haya ejecutado una vez y que las conexiones a ambas bases estén configuradas.
+La ventana tiene dos botones: **Probar conexiones** y **Ejecutar carga ETL**. También puedes abrir `Abrir_ETL_BIOX.bat` con doble clic. La carga requiere que `biox_dw.sql` se haya ejecutado una vez y que las conexiones a ambas bases estén configuradas.
 
 Para ejecutarlo desde consola sin ventana: `python etl_biox_dw.py`.
 
@@ -37,7 +37,7 @@ python -m streamlit run dashboard_biox_dw.py
 
 También puedes abrir `Abrir_Dashboard_BIOX.bat` con doble clic. Streamlit mostrará la dirección local del dashboard en la terminal.
 
-La alerta de existencias actuales consulta `inventario.v_stock_actual` en `Biox_OLTP`. El ELT también captura esa vista en `dw.fact_existencias` para guardar una fotografía por ejecución y calcular productos bajo el mínimo por mes. `fact_inventario` conserva eventos de entrada y salida, no saldos disponibles. Configura `OLTP_DB_*` para esa conexión, o permite que reutilice `DB_*` del `.env`. Las métricas analíticas usan `DW_DB_*` (con los valores comunes `DB_*` como alternativa). La aplicación realiza consultas de solo lectura y conserva resultados en caché hasta cinco minutos; el botón **Actualizar datos** invalida la caché.
+La alerta de existencias actuales consulta `inventario.v_stock_actual` en `Biox_OLTP`. El ETL también captura esa vista en `dw.fact_existencias` para guardar una fotografía por ejecución y calcular productos bajo el mínimo por mes. `fact_inventario` conserva eventos de entrada y salida, no saldos disponibles. Configura `OLTP_DB_*` para esa conexión, o permite que reutilice `DB_*` del `.env`. Las métricas analíticas usan `DW_DB_*` (con los valores comunes `DB_*` como alternativa). La aplicación realiza consultas de solo lectura y conserva resultados en caché hasta cinco minutos; el botón **Actualizar datos** invalida la caché.
 
 Las alertas inteligentes iniciales aplican reglas explícitas: stock bajo al alcanzar o quedar debajo del mínimo (crítico si es igual o menor al 50 % del mínimo), alta afluencia a partir del percentil 75 de entradas por hora del periodo, y satisfacción baja por debajo de 3.5/5 o por una caída de al menos 0.5 puntos contra el periodo anterior de igual duración.
 
@@ -51,13 +51,13 @@ Variables disponibles: `OLTP_DB_HOST`, `OLTP_DB_PORT`, `OLTP_DB_NAME`, `OLTP_DB_
 - `dw.fact_inventario`: una fila por movimiento operacional. Mantiene cantidad positiva, tipo y cantidad con signo. Es historia de movimientos, no una fotografía de existencias disponibles.
 - `dw.fact_afluencia`: una fila por registro de entrada o salida. Sus conteos no representan visitantes únicos.
 - `dw.fact_satisfaccion`: una fila por encuesta; conserva calificaciones numéricas y comentario textual.
-- `dw.fact_existencias`: una fotografía por producto activo y ejecución ELT; conserva la evolución de los saldos sin confundirlos con eventos de inventario.
+- `dw.fact_existencias`: una fotografía por producto activo y ejecución ETL; conserva la evolución de los saldos sin confundirlos con eventos de inventario.
 - `meta.kpi`: catálogo técnico y de negocio con fórmula, tipo (medida, métrica o indicador), periodicidad, dirección, fuente, responsable y acción correctiva.
 - `meta.kpi_meta`: metas por KPI y mes. `categoria_uuid IS NULL` identifica una meta global; un índice único por expresión evita duplicados con categoría nula.
 - `dw.kpi_mensual`: instantánea idempotente por KPI, mes y categoría. Conserva numerador y denominador junto al resultado.
 - `dw.vw_kpi_consolidado` centraliza las fórmulas mensuales; `meta.vw_kpi_cumplimiento` calcula el porcentaje y el estado (`cumplido`, `atencion`, `critico`, `sin_meta` o `informativo`) según la dirección del indicador.
 - `dw.dim_fecha` y `dw.dim_hora` son conformadas y se comparten entre los procesos temporales. `dim_hora` tiene granularidad de minuto e incluye intervalos de 15 minutos y franja horaria.
-- `dim_producto`, `dim_categoria` y `dim_usuario` son dimensiones SCD tipo 2. Las nuevas versiones se crean cuando el ELT observa cambios. Como el OLTP no guarda versiones históricas, no se recuperan cambios ocurridos antes de la primera ejecución del ELT.
+- `dim_producto`, `dim_categoria` y `dim_usuario` son dimensiones SCD tipo 2. Las nuevas versiones se crean cuando el ETL observa cambios. Como el OLTP no guarda versiones históricas, no se recuperan cambios ocurridos antes de la primera ejecución del ETL.
 - `dw.transform_staging(run_uuid)` construye dimensiones y hechos, reparte descuento e impuesto por línea y valida filas y agregados contra staging. Python no implementa esas transformaciones.
 - Al finalizar la validación, `dw.transform_staging` actualiza las instantáneas KPI con `MERGE`. Compara categorías nullable usando `IS NOT DISTINCT FROM` y solo actualiza valores que cambiaron.
 - Las razones conservan sus componentes: el ticket se calcula como importe cobrado agregado entre transacciones distintas, y la satisfacción como suma de calificaciones entre encuestas. Nunca se promedian los promedios mensuales.
