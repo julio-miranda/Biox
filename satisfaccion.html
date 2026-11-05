@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Encuesta de satisfacción | Vértigo</title>
+
+    <link rel="stylesheet" href="css/styles.css">
+
+    <style>
+        .page {
+            width: min(720px, 100%);
+            padding-top: 36px;
+        }
+
+        .survey-title {
+            margin-bottom: 8px;
+        }
+
+        .survey-description {
+            margin: 0;
+            color: var(--muted);
+            line-height: 1.6;
+        }
+
+        .survey-form {
+            display: grid;
+            gap: 18px;
+        }
+
+        .survey-form select,
+        .survey-form input,
+        .survey-form textarea {
+            width: 100%;
+            padding: 11px 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 7px;
+            background: #fff;
+            color: var(--text);
+        }
+
+        .survey-form select,
+        .survey-form input {
+            min-height: 43px;
+        }
+
+        .survey-form textarea {
+            resize: vertical;
+            min-height: 110px;
+        }
+
+        .survey-form select:focus,
+        .survey-form input:focus,
+        .survey-form textarea:focus {
+            border-color: var(--primary);
+            outline: 2px solid rgb(37 99 235 / 15%);
+        }
+
+        .survey-form label {
+            display: block;
+            margin-bottom: 7px;
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .survey-note {
+            padding: 12px 14px;
+            border-radius: 7px;
+            background: #eff6ff;
+            color: #1e40af;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+
+        .survey-submit {
+            width: 100%;
+            min-height: 44px;
+        }
+
+        .survey-footer {
+            margin-top: 18px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.5;
+            text-align: center;
+        }
+
+        @media (max-width: 600px) {
+            .page {
+                padding: 18px 14px;
+            }
+
+            .card {
+                padding: 18px;
+            }
+        }
+    </style>
+
+    <script
+        src="js/controllers/satisfaccion.client.controller.js"
+        defer
+    ></script>
+</head>
+
+<body data-page="encuesta-satisfaccion">
+
+    <main class="page">
+
+        <header class="page-header">
+            <div>
+                <h1 class="survey-title">Encuesta de satisfacción</h1>
+                <p class="survey-description">
+                    Vértigo agradece tu opinión. Tus respuestas nos ayudan
+                    a mejorar la experiencia en el establecimiento.
+                </p>
+            </div>
+        </header>
+
+        <section class="card">
+
+            <div class="card-header">
+                <h2>Cuéntanos tu experiencia</h2>
+            </div>
+
+            <p class="survey-note">
+                La encuesta es anónima. No solicitamos nombre, correo
+                electrónico ni otros datos personales.
+            </p>
+
+            <div
+                id="mensaje"
+                class="message"
+                role="status"
+                aria-live="polite"
+            ></div>
+
+            <form
+                id="encuesta-form"
+                class="survey-form"
+                autocomplete="off"
+            >
+
+                <div class="form-group">
+                    <label for="mesa_numero">Número de mesa *</label>
+
+                    <input
+                        type="number"
+                        id="mesa_numero"
+                        name="mesa_numero"
+                        min="1"
+                        step="1"
+                        placeholder="Ej. 12"
+                        required
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label for="ambiente">
+                        ¿Cómo calificas el ambiente general? *
+                    </label>
+
+                    <select id="ambiente" name="ambiente" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="musica">
+                        ¿Cómo calificas la música o selección del DJ? *
+                    </label>
+
+                    <select id="musica" name="musica" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="atencion">
+                        ¿Cómo calificas la atención del personal? *
+                    </label>
+
+                    <select id="atencion" name="atencion" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="seguridad">
+                        ¿Cómo calificas la seguridad del lugar? *
+                    </label>
+
+                    <select id="seguridad" name="seguridad" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="limpieza">
+                        ¿Cómo calificas la limpieza del establecimiento? *
+                    </label>
+
+                    <select id="limpieza" name="limpieza" required>
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="tiempo_espera">
+                        ¿Cómo calificas el tiempo de espera para ser atendido? *
+                    </label>
+
+                    <select
+                        id="tiempo_espera"
+                        name="tiempo_espera"
+                        required
+                    >
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Excelente</option>
+                        <option value="4">4 - Bueno</option>
+                        <option value="3">3 - Regular</option>
+                        <option value="2">2 - Malo</option>
+                        <option value="1">1 - Muy malo</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="recomendacion">
+                        ¿Qué tan probable es que recomiendes Vértigo? *
+                    </label>
+
+                    <select
+                        id="recomendacion"
+                        name="recomendacion"
+                        required
+                    >
+                        <option value="">Selecciona una opción</option>
+                        <option value="5">5 - Definitivamente la recomendaría</option>
+                        <option value="4">4 - Probablemente la recomendaría</option>
+                        <option value="3">3 - No estoy seguro</option>
+                        <option value="2">2 - Probablemente no la recomendaría</option>
+                        <option value="1">1 - Definitivamente no la recomendaría</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="comentario">Comentario opcional</label>
+
+                    <textarea
+                        id="comentario"
+                        name="comentario"
+                        rows="4"
+                        maxlength="1000"
+                        placeholder="Escribe una sugerencia o comentario..."
+                    ></textarea>
+                </div>
+
+                <input
+                    type="hidden"
+                    id="canal"
+                    name="canal"
+                    value="qr"
+                >
+
+                <button
+                    type="submit"
+                    class="btn btn-primary survey-submit"
+                    id="btnEnviarEncuesta"
+                >
+                    Enviar encuesta
+                </button>
+
+            </form>
+
+            <p class="survey-footer">
+                Gracias por ayudarnos a mejorar. Tus respuestas se utilizarán
+                para analizar la satisfacción de los clientes.
+            </p>
+
+        </section>
+
+    </main>
+
+</body>
+</html>
