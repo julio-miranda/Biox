@@ -1,0 +1,1133 @@
+
+:root {
+    --primary: #2563eb;
+    --primary-dark: #1d4ed8;
+    --background: #f3f6fb;
+    --surface: #fff;
+    --text: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --input-border: #cbd5e1;
+    --success: #15803d;
+    --danger: #b91c1c;
+    --radius: 8px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: var(--background);
+    color: var(--text);
+    font-family: Arial, Helvetica, sans-serif;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+button,
+.action-button {
+    cursor: pointer;
+}
+
+input,
+select,
+textarea {
+    max-width: 100%;
+}
+
+[hidden],
+.hidden {
+    display: none !important;
+}
+
+/* Estructura */
+
+.page,
+.sales-page {
+    width: min(1440px, 100%);
+    margin: 0 auto;
+    padding: 24px;
+}
+
+.page-header,
+.card-header,
+.toolbar,
+.inventory-toolbar,
+.inventory-actions,
+.inventory-toolbar > .panel-actions,
+.actions,
+.table-actions,
+.form-actions,
+.sales-header,
+.sales-actions,
+.cart-summary-actions,
+.modal-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.page-header,
+.card-header,
+.toolbar,
+.inventory-toolbar,
+.sales-header {
+    justify-content: space-between;
+}
+
+.page-header {
+    margin-bottom: 24px;
+    gap: 20px;
+}
+
+.page-header h1 {
+    margin: 0 0 8px;
+    font-size: 28px;
+}
+
+.page-header p {
+    margin: 0;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.card-header h2,
+.sales-panel h2 {
+    margin-top: 0;
+}
+
+.card-header h2 {
+    margin-bottom: 0;
+    font-size: 19px;
+}
+
+/* Paneles */
+
+.card,
+.stat-card,
+.sales-panel {
+    min-width: 0;
+    margin-bottom: 22px;
+    padding: 22px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface);
+    box-shadow: 0 3px 12px rgb(15 23 42 / 4%);
+}
+
+.card-header {
+    margin-bottom: 20px;
+}
+
+/* Formularios */
+
+.form-grid,
+.modal-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+}
+
+.form-group,
+.sales-field,
+.modal-field {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 7px;
+}
+
+.form-group label,
+.inventory-modal-form label,
+.sales-field label,
+.modal-field label {
+    color: var(--text);
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.4;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea,
+.search-input,
+.inventory-toolbar > input[type="search"],
+.inventory-modal-form input,
+.inventory-modal-form select,
+.inventory-modal-form textarea,
+.sales-field input,
+.sales-field select,
+.modal-field input,
+.modal-field select,
+.modal-field textarea {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    margin: 0;
+    padding: 10px 12px;
+    border: 1px solid var(--input-border);
+    border-radius: var(--radius);
+    background: #fff;
+    color: var(--text);
+}
+
+.form-group textarea,
+.inventory-modal-form textarea,
+.modal-field textarea {
+    min-height: 90px;
+    resize: vertical;
+}
+
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus,
+.search-input:focus,
+.inventory-modal-form input:focus,
+.inventory-modal-form select:focus,
+.inventory-modal-form textarea:focus,
+.sales-field input:focus,
+.sales-field select:focus,
+.modal-field input:focus,
+.modal-field select:focus,
+.modal-field textarea:focus {
+    border-color: var(--primary);
+    outline: 2px solid rgb(37 99 235 / 15%);
+    outline-offset: 1px;
+}
+
+.form-group input:disabled,
+.form-group select:disabled,
+.form-group textarea:disabled {
+    background: #f1f5f9;
+    cursor: not-allowed;
+}
+
+.form-group small,
+.inventory-modal-form small,
+.inventory-modal-form p,
+.password-note,
+.secondary-text {
+    color: var(--muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.inventory-modal-form {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.inventory-modal-form label {
+    margin-top: 8px;
+}
+
+.inventory-modal-form p {
+    margin: 2px 0 8px;
+}
+
+.secondary-text {
+    display: block;
+    margin-top: 4px;
+}
+
+.form-group.full-width,
+.modal-field.full-width {
+    grid-column: 1 / -1;
+}
+
+/* Casillas */
+
+.checkbox-group,
+.form-check {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 9px;
+}
+
+.checkbox-group input,
+.form-check input {
+    width: 17px;
+    height: 17px;
+    margin: 0;
+    accent-color: var(--primary);
+}
+
+.checkbox-group label {
+    font-size: 14px;
+    font-weight: 400;
+}
+
+/* Botones */
+
+.btn,
+.btn-crud,
+.btn-crear,
+.btn-ver,
+.btn-editar,
+.btn-eliminar,
+.btn-guardar,
+.btn-cancelar,
+.btn-editar-producto,
+.btn-editar-receta,
+.btn-eliminar-producto,
+.btn-eliminar-receta,
+.action-button {
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.3;
+    text-align: center;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color .15s, border-color .15s, color .15s;
+}
+
+.btn {
+    min-height: 40px;
+    padding: 9px 15px;
+    border-radius: 7px;
+    font-size: 13px;
+}
+
+.btn-crear,
+.btn-guardar,
+.btn-primary {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+.btn-crear:hover,
+.btn-guardar:hover,
+.btn-primary:hover {
+    border-color: var(--primary-dark);
+    background: var(--primary-dark);
+}
+
+.btn-ver {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.btn-ver:hover {
+    background: #dbeafe;
+}
+
+.btn-editar,
+.btn-editar-producto,
+.btn-editar-receta,
+.action-edit {
+    border-color: #fde68a;
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.btn-editar:hover,
+.btn-editar-producto:hover,
+.btn-editar-receta:hover {
+    background: #fde68a;
+}
+
+.btn-eliminar,
+.btn-eliminar-producto,
+.btn-eliminar-receta,
+.btn-danger,
+.action-delete {
+    border-color: #fecaca;
+    background: #fee2e2;
+    color: var(--danger);
+}
+
+.btn-eliminar:hover,
+.btn-eliminar-producto:hover,
+.btn-eliminar-receta:hover,
+.btn-danger:hover {
+    background: #fecaca;
+}
+
+.btn-cancelar,
+.btn-secondary {
+    border-color: var(--input-border);
+    background: #fff;
+    color: var(--text);
+}
+
+.btn-cancelar:hover,
+.btn-secondary:hover {
+    background: #f1f5f9;
+}
+
+.btn-success {
+    border-color: #bbf7d0;
+    background: #dcfce7;
+    color: var(--success);
+}
+
+.btn:disabled,
+.btn-crud:disabled,
+.btn-crear:disabled,
+.btn-ver:disabled,
+.btn-editar:disabled,
+.btn-eliminar:disabled,
+.btn-guardar:disabled,
+.btn-cancelar:disabled,
+.btn-editar-producto:disabled,
+.btn-editar-receta:disabled,
+.btn-eliminar-producto:disabled,
+.btn-eliminar-receta:disabled {
+    opacity: .55;
+    cursor: not-allowed;
+}
+
+.btn-small,
+.btn-crud.btn-small {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 12px;
+}
+
+.btn-crud.btn-large {
+    min-height: 44px;
+    padding: 11px 18px;
+    font-size: 14px;
+}
+
+.btn:focus-visible,
+.btn-crud:focus-visible,
+.btn-crear:focus-visible,
+.btn-ver:focus-visible,
+.btn-editar:focus-visible,
+.btn-eliminar:focus-visible,
+.btn-guardar:focus-visible,
+.btn-cancelar:focus-visible,
+.btn-editar-producto:focus-visible,
+.btn-editar-receta:focus-visible,
+.btn-eliminar-producto:focus-visible,
+.btn-eliminar-receta:focus-visible {
+    outline: 3px solid rgb(37 99 235 / 30%);
+    outline-offset: 2px;
+}
+
+.table-actions .btn,
+.table-actions .btn-crud,
+.table-actions .btn-ver,
+.table-actions .btn-editar,
+.table-actions .btn-eliminar,
+.table-actions .btn-editar-producto,
+.table-actions .btn-editar-receta,
+.table-actions .btn-eliminar-producto {
+    min-height: 32px;
+    padding: 6px 9px;
+    font-size: 12px;
+}
+
+.form-actions {
+    justify-content: flex-end;
+    margin-top: 24px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+/* Búsqueda y herramientas */
+
+.toolbar,
+.inventory-toolbar {
+    margin-bottom: 18px;
+}
+
+.search-container {
+    width: min(420px, 100%);
+}
+
+.inventory-toolbar > input[type="search"] {
+    width: min(360px, 100%);
+}
+
+.inventory-actions__heading {
+    margin-right: auto;
+}
+
+.results-count,
+.section-note {
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.section-note {
+    margin: 0 0 18px;
+    line-height: 1.5;
+}
+
+.product-purchase-fields {
+    margin-top: 20px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: #f8fafc;
+}
+
+.product-purchase-fields h3 {
+    margin: 0 0 16px;
+}
+
+/* Tablas */
+
+.table-container,
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
+
+table,
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    white-space: nowrap;
+}
+
+th,
+td,
+.table th,
+.table td {
+    padding: 12px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+    font-size: 13px;
+}
+
+th,
+.table th {
+    background: #f8fafc;
+    color: #475569;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+tbody tr:hover {
+    background: #f8fafc;
+}
+
+.employee-name {
+    font-weight: 600;
+}
+
+.inventory-stock-detail {
+    display: block;
+    margin-top: 4px;
+    color: #64748b;
+    font-size: 11px;
+    white-space: normal;
+}
+
+.table-actions {
+    gap: 6px;
+}
+
+.status-low {
+    color: #b3261e;
+    font-weight: 600;
+}
+
+.status-normal {
+    color: #137333;
+    font-weight: 600;
+}
+
+.status-na {
+    color: #666;
+}
+
+/* Indicadores */
+
+.badge,
+.sale-status {
+    display: inline-block;
+    padding: 5px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.badge-active,
+.badge-success {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.badge-inactive,
+.badge-danger,
+.sale-status.cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.badge-role {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.sale-status {
+    background: #e8f0fe;
+    color: #174ea6;
+}
+
+/* Mensajes */
+
+.message {
+    display: none;
+    margin-bottom: 18px;
+    padding: 12px 15px;
+    border-radius: var(--radius);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.message.show {
+    display: block;
+}
+
+.message.success {
+    border: 1px solid #bbf7d0;
+    background: #dcfce7;
+    color: #166534;
+}
+
+.message.error {
+    border: 1px solid #fecaca;
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.message.info {
+    border: 1px solid var(--border);
+    background: #f8fafc;
+    color: var(--muted);
+}
+
+/* Inicio de sesión */
+
+.login-body {
+    display: grid;
+    min-height: 100vh;
+    place-items: center;
+    padding: 32px 16px;
+    background:
+        radial-gradient(circle at 15% 15%, rgb(37 99 235 / 9%), transparent 31%),
+        radial-gradient(circle at 85% 85%, rgb(21 128 61 / 8%), transparent 29%),
+        var(--background);
+}
+
+.login-page {
+    width: min(100%, 440px);
+}
+
+.login-brand {
+    display: inline-block;
+    margin: 0 0 17px 4px;
+    color: var(--text);
+    font-size: 25px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-decoration: none;
+}
+
+.login-brand span {
+    color: var(--primary);
+}
+
+.login-card {
+    margin: 0;
+    padding: 32px;
+}
+
+.login-eyebrow {
+    margin: 0 0 9px;
+    color: var(--primary);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .12em;
+}
+
+.login-card h1 {
+    margin: 0;
+    font-size: 27px;
+}
+
+.login-intro {
+    margin: 9px 0 0;
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.55;
+}
+
+.login-form {
+    display: grid;
+    gap: 15px;
+    margin-top: 24px;
+}
+
+.login-form .btn {
+    width: 100%;
+}
+
+.login-form .message {
+    margin: 0;
+}
+
+.login-footer {
+    margin: 17px 0 0;
+    color: var(--muted);
+    font-size: 12px;
+    text-align: center;
+}
+
+.sales-message {
+    margin-bottom: 16px;
+}
+
+.empty-state,
+.loading-state,
+.empty-message {
+    padding: 24px;
+    color: var(--muted);
+    text-align: center;
+}
+
+/* Estadísticas */
+
+.stats-container {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+    margin-bottom: 22px;
+}
+
+.stats-container[data-inventory-summary] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.stat-card h3 {
+    margin: 0 0 12px;
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.stat-card p {
+    margin: 0;
+    font-size: 25px;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+}
+
+/* Ventas */
+
+.sales-page {
+    width: min(1400px, 96%);
+    padding: 24px 0;
+}
+
+.sales-header {
+    margin-bottom: 24px;
+    gap: 16px;
+}
+
+.sales-header h1 {
+    margin: 0 0 6px;
+}
+
+.sales-toolbar,
+.sales-filters {
+    display: grid;
+    align-items: end;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.sales-toolbar {
+    grid-template-columns: minmax(200px, 2fr) minmax(100px, .7fr)
+        minmax(150px, 1fr) minmax(120px, 1fr) auto;
+}
+
+.sales-combobox {
+    position: relative;
+    z-index: 2;
+}
+
+.sales-combobox__options {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    right: 0;
+    left: 0;
+    max-height: 320px;
+    overflow-y: auto;
+    border: 1px solid var(--input-border);
+    border-radius: 8px;
+    background: var(--surface);
+    box-shadow: 0 8px 22px rgb(15 23 42 / 16%);
+}
+
+.sales-combobox__options[hidden] {
+    display: none;
+}
+
+.sales-toolbar .sales-combobox__option {
+    display: grid;
+    width: 100%;
+    min-height: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 4px 12px;
+    padding: 10px 12px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--text);
+    cursor: pointer;
+    text-align: left;
+}
+
+.sales-toolbar .sales-combobox__option:hover,
+.sales-toolbar .sales-combobox__option.is-active {
+    background: #eef4ff;
+}
+
+.sales-combobox__price {
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sales-combobox__option small {
+    grid-column: 1 / -1;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.sales-combobox__empty {
+    padding: 12px;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+.sales-filters {
+    grid-template-columns: minmax(200px, 1fr)
+        repeat(2, minmax(150px, 220px)) auto;
+}
+
+.sales-actions,
+.cart-summary-actions,
+.modal-actions {
+    gap: 10px;
+}
+
+.sales-actions button,
+.sales-toolbar button,
+.sales-filters button,
+.cart-summary-actions button,
+.modal-actions button {
+    min-height: 40px;
+    padding: 9px 14px;
+    border-radius: 6px;
+}
+
+.sales-secondary-actions {
+    margin-bottom: 18px;
+}
+
+.btn-outline {
+    border: 1px solid #8b949e;
+    background: transparent;
+    color: inherit;
+}
+
+.btn-icon {
+    min-height: 34px !important;
+    padding: 7px 10px !important;
+}
+
+.cart-summary {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 18px;
+    margin-top: 18px;
+    font-size: 1.1rem;
+}
+
+.cart-summary-actions {
+    justify-content: flex-end;
+    margin-top: 18px;
+}
+
+/* Recetas e ingredientes */
+
+.recipe-ingredients,
+#recIngredientes {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.recipe-ingredients {
+    margin-top: 20px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border);
+}
+
+.recipe-consumption-preview,
+.recipe-consumption {
+    color: var(--text);
+    font-size: 13px;
+}
+
+.recipe-consumption-preview {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    border-left: 3px solid var(--primary);
+    border-radius: 4px;
+    background: #eff6ff;
+}
+
+.recipe-consumption-preview.is-warning,
+.recipe-consumption.is-warning {
+    border-left-color: #b45309;
+    background: #fff7ed;
+    color: #7c2d12;
+}
+
+.recipe-consumption small {
+    display: block;
+    margin-top: 6px;
+    color: #9a3412;
+}
+
+.recipe-ingredients h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.recipe-ingredient-row,
+.ingredient-row {
+    display: grid;
+    grid-template-columns: minmax(150px, 2fr) minmax(90px, 1fr)
+        minmax(100px, 1fr) minmax(90px, 1fr) auto;
+    align-items: end;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: #f8fafc;
+}
+
+.recipe-ingredient-row select,
+.recipe-ingredient-row input,
+.ingredient-row select,
+.ingredient-row input {
+    width: 100%;
+    min-width: 0;
+    min-height: 40px;
+    padding: 8px;
+    border: 1px solid var(--input-border);
+    border-radius: 6px;
+    background: #fff;
+    color: var(--text);
+    font-size: 13px;
+}
+
+.recipe-ingredient-row .btn {
+    min-height: 36px;
+}
+
+.ingredient-row .form-group {
+    min-width: 0;
+}
+
+.ingredient-remove {
+    padding: 9px 12px;
+    border: 0;
+    border-radius: 6px;
+    background: #fce8e6;
+    color: #b3261e;
+}
+
+/* Modales */
+
+.modal-form {
+    width: min(720px, 94vw);
+    max-height: 88vh;
+    overflow-y: auto;
+    padding: 24px;
+    border: 0;
+    border-radius: 12px;
+    box-shadow: 0 10px 40px rgb(0 0 0 / 25%);
+}
+
+.modal-form::backdrop {
+    background: rgb(0 0 0 / 55%);
+}
+
+.modal-form h2 {
+    margin-top: 0;
+}
+
+.modal-actions {
+    justify-content: flex-end;
+    margin-top: 22px;
+}
+
+/* Adaptación a tabletas */
+
+@media (max-width: 900px) {
+    .page {
+        padding: 22px;
+    }
+
+    .form-grid,
+    .modal-grid,
+    .sales-toolbar,
+    .sales-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .stats-container {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+    }
+
+    .stat-card {
+        padding: 16px;
+    }
+}
+
+/* Adaptación a móviles */
+
+@media (max-width: 700px) {
+    .page {
+        padding: 16px;
+    }
+
+    .page-header {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .page-header h1 {
+        font-size: 24px;
+    }
+
+    .form-grid,
+    .modal-grid,
+    .sales-toolbar,
+    .sales-filters,
+    .recipe-ingredient-row,
+    .ingredient-row {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 16px;
+    }
+
+    .stats-container {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card,
+    .stat-card,
+    .sales-panel,
+    .modal-form {
+        padding: 16px;
+    }
+
+    .card-header,
+    .toolbar,
+    .inventory-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .search-container,
+    .inventory-toolbar > input[type="search"] {
+        width: 100%;
+    }
+
+    .inventory-toolbar > .panel-actions {
+        display: grid;
+        grid-template-columns: 1fr;
+    }
+
+    .inventory-toolbar > .panel-actions .btn {
+        width: 100%;
+    }
+
+    .form-actions .btn {
+        flex: 1 1 auto;
+    }
+
+    .stats-container {
+        grid-template-columns: 1fr;
+    }
+
+    .recipe-ingredient-row .btn,
+    .table-actions .btn {
+        width: 100%;
+    }
+
+    .table-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .table-actions .btn,
+    .table-actions .btn-crud,
+    .table-actions .btn-ver,
+    .table-actions .btn-editar,
+    .table-actions .btn-eliminar,
+    .table-actions .btn-editar-producto,
+    .table-actions .btn-editar-receta,
+    .table-actions .btn-eliminar-producto {
+        min-height: 36px;
+        padding: 8px 10px;
+    }
+
+    .sales-page {
+        width: 94%;
+    }
+
+    .cart-summary {
+        justify-content: space-between;
+    }
+
+    .cart-summary-actions {
+        justify-content: stretch;
+    }
+
+    .cart-summary-actions button {
+        flex: 1;
+    }
+
+    .form-group.full-width,
+    .modal-field.full-width {
+        grid-column: auto;
+    }
+}
